@@ -1,0 +1,100 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "Hands-On Large Language Models",
+  "projectDescription": "Official code repository for the O'Reilly book teaching practical LLM concepts through visual education and hands-on examples.",
+  "theme": "palm",
+  "primaryColor": "#db3939",
+  "lightColor": "#efacac",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "setup"
+            ]
+          },
+          {
+            "group": "Fundamentals",
+            "pages": [
+              "fundamentals/language-models",
+              "fundamentals/tokens-embeddings",
+              "fundamentals/transformer-architecture"
+            ]
+          },
+          {
+            "group": "Core Applications",
+            "pages": [
+              "applications/text-classification",
+              "applications/text-clustering"
+            ]
+          },
+          {
+            "group": "Advanced Techniques",
+            "pages": [
+              "advanced/prompt-engineering",
+              "advanced/text-generation",
+              "advanced/semantic-search-rag",
+              "advanced/multimodal-llms"
+            ]
+          },
+          {
+            "group": "Model Development",
+            "pages": [
+              "development/creating-embeddings",
+              "development/fine-tuning-classification",
+              "development/fine-tuning-generation"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Bonus Content",
+        "groups": [
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "bonus/deeplearningai-course",
+              "bonus/quantization",
+              "bonus/mamba",
+              "bonus/mixture-of-experts",
+              "bonus/stable-diffusion",
+              "bonus/reasoning-llms",
+              "bonus/deepseek-r1",
+              "bonus/llm-agents"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "12 comprehensive chapters covering LLM fundamentals to advanced techniques",
+    "Jupyter notebook tutorials with hands-on code examples",
+    "Visual educational approach with 300+ custom illustrations",
+    "Coverage of text classification, clustering, prompt engineering, and RAG",
+    "Fine-tuning guides for both representation and generation models",
+    "Multimodal LLM exploration and implementation",
+    "Bonus content on cutting-edge topics (Mamba, MoE, Quantization, Reasoning LLMs)",
+    "Integration with major LLM providers (OpenAI, Cohere)"
+  ],
+  "publicApiSurface": [
+    "Chapter 1: Introduction to Language Models",
+    "Chapter 2: Tokens and Embeddings",
+    "Chapter 3: Looking Inside Transformer LLMs",
+    "Chapter 4: Text Classification",
+    "Chapter 5: Text Clustering and Topic Modeling",
+    "Chapter 6: Prompt Engineering",
+    "Chapter 7: Advanced Text Generation Techniques and Tools",
+    "Chapter 8: Semantic Search and Retrieval-Augmented Generation",
+    "Chapter 9: Multimodal Large Language Models",
+    "Chapter 10: Creating Text Embedding Models",
+    "Chapter 11: Fine-tuning Representation Models for Classification",
+    "Chapter 12: Fine-tuning Generation Models"
+  ]
+}
