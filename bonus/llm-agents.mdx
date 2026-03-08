@@ -1,0 +1,335 @@
+---
+title: A Visual Guide to LLM Agents
+description: Explore how LLMs become autonomous through tools, memory, and planning capabilities
+---
+
+LLM agents represent the evolution from passive question-answering systems to autonomous problem-solvers. By combining language models with tools, memory, and planning capabilities, agents can tackle complex, multi-step tasks with minimal human intervention.
+
+<Card
+  title="A Visual Guide to LLM Agents"
+  icon="robot"
+  href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-llm-agents"
+>
+  Read the full illustrated guide to LLM agents
+</Card>
+
+## Why LLM Agents Matter
+
+Standard LLMs are powerful but limited:
+- Only have knowledge from training data
+- Can't interact with external systems
+- No persistent memory
+- Can't execute complex multi-step plans autonomously
+
+LLM agents overcome these limitations:
+
+- **Tool use**: Access external APIs, databases, calculators, search engines
+- **Memory**: Maintain context across sessions and conversations
+- **Planning**: Break down complex goals into actionable steps
+- **Autonomy**: Execute multi-step procedures with minimal guidance
+
+<Info>
+  Agents transform LLMs from sophisticated text generators into capable digital assistants that can actually get things done.
+</Info>
+
+## What You'll Learn
+
+This visual guide provides comprehensive coverage of LLM agent architectures:
+
+<CardGroup cols={2}>
+  <Card title="Core Components" icon="cubes">
+    - Tool integration
+    - Memory systems
+    - Planning frameworks
+    - Reasoning loops
+  </Card>
+  
+  <Card title="Advanced Topics" icon="rocket">
+    - ReAct framework
+    - Model Context Protocol
+    - Multi-agent collaboration
+    - Agent orchestration
+  </Card>
+</CardGroup>
+
+## The Three Pillars of LLM Agents
+
+Every capable agent needs three core capabilities:
+
+### 1. Tools
+
+Extending the LLM's capabilities through external functions:
+
+**What are Tools?**
+- Functions the agent can call
+- APIs for external services
+- Database queries
+- Code execution environments
+- Search engines
+- Calculators
+
+**How Tools Work**:
+1. Agent receives task
+2. Determines which tool(s) to use
+3. Generates tool calls with parameters
+4. Executes tools
+5. Incorporates results into reasoning
+
+<Note>
+  Chapter 7 introduces tool use. This guide expands that into full agent capabilities with planning and memory.
+</Note>
+
+### 2. Memory
+
+Maintaining state and context:
+
+**Short-Term Memory**:
+- Current conversation context
+- Recent tool results
+- Working variables and state
+
+**Long-Term Memory**:
+- Vector databases of past interactions
+- User preferences and history
+- Learned patterns and procedures
+- Retrieved when relevant
+
+**How Memory Enhances Agents**:
+- Learn from past interactions
+- Maintain consistency across sessions
+- Reference previous solutions
+- Build on accumulated knowledge
+
+### 3. Planning
+
+Enabling autonomous multi-step behavior:
+
+**What is Planning?**
+- Breaking goals into sub-goals
+- Sequencing actions
+- Adapting to feedback
+- Recovering from errors
+
+**Planning Strategies**:
+- **ReAct**: Reason and Act in loops
+- **Tree-of-Thoughts**: Explore multiple solution paths
+- **Hierarchical Planning**: Nested sub-goals
+- **Reactive Planning**: Adapt dynamically
+
+## The ReAct Framework
+
+Reason and Act (ReAct) is the foundational pattern for agent behavior:
+
+### The ReAct Loop
+
+1. **Thought**: Reason about the current state and what to do next
+2. **Action**: Execute a tool or take a step
+3. **Observation**: Observe the result
+4. **Repeat**: Continue until goal achieved
+
+### Example ReAct Trace
+
+```
+Task: What's the weather in the capital of France?
+
+Thought: I need to find the capital of France first.
+Action: search("capital of France")
+Observation: Paris is the capital of France.
+
+Thought: Now I need to get the weather in Paris.
+Action: weather("Paris")
+Observation: Currently 18°C, partly cloudy.
+
+Thought: I have the answer.
+Answer: The weather in Paris (capital of France) is currently 18°C and partly cloudy.
+```
+
+<Info>
+  ReAct combines reasoning (chain-of-thought) with acting (tool use), creating a powerful synergy.
+</Info>
+
+## Model Context Protocol (MCP)
+
+The guide explores MCP in depth—a standardized way to connect LLMs to tools:
+
+### What is MCP?
+
+A protocol for:
+- **Tool discovery**: Agents learn what tools are available
+- **Standardized interfaces**: Consistent tool calling across providers
+- **Resource access**: Unified way to access data sources
+- **Sampling**: Agents can request LLM completions
+
+### MCP Architecture
+
+**Components**:
+- **MCP Servers**: Expose tools and resources
+- **MCP Clients**: LLM applications that use tools
+- **Protocol**: Standardized communication layer
+- **SDKs**: Easy implementation in various languages
+
+**Benefits**:
+- Write tool servers once, use with any MCP client
+- Growing ecosystem of MCP servers
+- Easier agent development
+- Better interoperability
+
+<Note>
+  MCP is becoming the standard for LLM tool use, similar to how HTTP standardized web communication.
+</Note>
+
+## Multi-Agent Collaboration
+
+The guide concludes with multi-agent systems:
+
+### Why Multiple Agents?
+
+- **Specialization**: Different agents for different expertise
+- **Scalability**: Parallel processing of sub-tasks
+- **Robustness**: Redundancy and error checking
+- **Modularity**: Easier to develop and maintain
+
+### Collaboration Patterns
+
+**Sequential**: Agents work in a pipeline
+```
+Agent 1 (Research) → Agent 2 (Analysis) → Agent 3 (Writing)
+```
+
+**Hierarchical**: Manager agent coordinates workers
+```
+Manager Agent
+├─ Research Agent
+├─ Code Agent
+└─ Writing Agent
+```
+
+**Collaborative**: Agents discuss and debate
+```
+Multiple agents propose solutions, critique each other, reach consensus
+```
+
+<CardGroup cols={2}>
+  <Card title="AutoGen" icon="users">
+    Microsoft's framework for multi-agent conversations
+  </Card>
+  
+  <Card title="CrewAI" icon="people-group">
+    Role-based agent collaboration framework
+  </Card>
+</CardGroup>
+
+## Agent Memory Architectures
+
+The guide illustrates different memory approaches:
+
+### Vector Memory
+- Store interactions as embeddings
+- Retrieve relevant past experiences
+- Scale to large histories
+- Semantic search over memory
+
+### Structured Memory
+- Explicit knowledge graphs
+- Relational databases
+- Queryable facts and relationships
+- More interpretable
+
+### Hybrid Approaches
+- Combine vector and structured memory
+- Use each for appropriate tasks
+- Best of both worlds
+
+## Practical Agent Systems
+
+The guide covers real-world agent frameworks:
+
+<CardGroup cols={2}>
+  <Card title="LangChain Agents" icon="link">
+    Popular framework with extensive tool ecosystem
+  </Card>
+  
+  <Card title="AutoGPT" icon="robot">
+    Autonomous agent for goal-directed tasks
+  </Card>
+  
+  <Card title="BabyAGI" icon="baby">
+    Task-driven autonomous agent
+  </Card>
+  
+  <Card title="MetaGPT" icon="briefcase">
+    Multi-agent software development team
+  </Card>
+</CardGroup>
+
+## Visual Highlights
+
+The guide features detailed illustrations of:
+
+- Agent architecture components
+- ReAct reasoning loops
+- Model Context Protocol flows
+- Multi-agent collaboration patterns
+- Memory system architectures
+- Planning and execution workflows
+
+## Challenges and Limitations
+
+The guide honestly addresses current limitations:
+
+- **Reliability**: Agents can make mistakes or get stuck
+- **Cost**: Many LLM calls can be expensive
+- **Latency**: Multi-step reasoning takes time
+- **Safety**: Need guardrails for autonomous systems
+- **Evaluation**: Hard to measure agent quality comprehensively
+
+## How This Extends the Book
+
+**Chapter 7** introduces tool use and basic agent concepts.
+
+**Chapter 8** covers RAG (a form of tool use for retrieval).
+
+This guide extends those chapters by:
+
+- Adding **memory systems** for stateful agents
+- Introducing **planning frameworks** like ReAct
+- Exploring **multi-agent collaboration**
+- Showcasing **MCP** as a modern standard
+- Demonstrating **autonomous behavior** patterns
+
+<Info>
+  Agents represent the natural evolution of the tools and techniques introduced in Chapters 7 and 8 into fully autonomous systems.
+</Info>
+
+## Prerequisites
+
+Before exploring this guide, you should have:
+
+- Read **Chapter 7** (Prompt Engineering and Tool Use)
+- Read **Chapter 8** (Retrieval-Augmented Generation)
+- Understanding of chain-of-thought reasoning (Chapter 6)
+- Familiarity with tool calling and function calling
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Chapter 7: Tool Use" icon="book" href="/advanced/prompt-engineering">
+    Foundation for understanding agent tools
+  </Card>
+  
+  <Card title="Chapter 8: RAG" icon="book" href="/advanced/semantic-search-rag">
+    Retrieval as a form of tool use
+  </Card>
+  
+  <Card title="Reasoning LLMs" icon="brain" href="/bonus/reasoning-llms">
+    Enhanced reasoning for smarter agents
+  </Card>
+  
+  <Card title="DeepSeek-R1" icon="robot" href="/bonus/deepseek-r1">
+    Powerful reasoning models for agent use
+  </Card>
+</CardGroup>
+
+<Note>
+  LLM agents are rapidly evolving. The patterns in this guide form a foundation, but the field is advancing quickly with new techniques and frameworks emerging regularly.
+</Note>

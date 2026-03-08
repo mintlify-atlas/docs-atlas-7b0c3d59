@@ -1,0 +1,469 @@
+---
+title: Environment Setup
+description: Complete guide to setting up your local development environment for Hands-On LLMs
+---
+
+# Environment Setup
+
+This guide covers everything you need to set up your local environment for running the examples in Hands-On Large Language Models.
+
+<Note>
+While we recommend Google Colab for the easiest setup, running locally gives you more control and flexibility for experimentation and development.
+</Note>
+
+## Setup Options
+
+You have two main options for running the code:
+
+<CardGroup cols={2}>
+  <Card title="Google Colab (Recommended)" icon="cloud">
+    **Pros**: No setup, free GPU, works anywhere
+    
+    **Cons**: Session limits, no persistent storage
+    
+    Perfect for: Learning, following along with the book
+  </Card>
+  <Card title="Local Installation" icon="laptop">
+    **Pros**: Full control, persistent environment, unlimited sessions
+    
+    **Cons**: Requires setup, needs compatible GPU
+    
+    Perfect for: Development, experimentation, production
+  </Card>
+</CardGroup>
+
+## Local Setup with Conda
+
+Our preferred method for local setup uses Conda for environment management.
+
+<Steps>
+  <Step title="Install Miniconda">
+    Download and install [Miniconda](https://docs.anaconda.com/free/miniconda/miniconda-other-installer-links/) for your operating system.
+
+    Choose an installer with Python 3.10 pre-installed:
+
+    <Tabs>
+      <Tab title="Windows">
+        Download: `Miniconda3-py310_XX.X.X-Windows-x86_64.exe`
+        
+        Run the installer and follow the prompts. Make sure to check "Add Miniconda to PATH" during installation.
+      </Tab>
+      <Tab title="macOS">
+        Download: `Miniconda3-py310_XX.X.X-MacOSX-x86_64.pkg`
+        
+        ```bash
+        bash Miniconda3-py310_XX.X.X-MacOSX-x86_64.sh
+        ```
+      </Tab>
+      <Tab title="Linux">
+        Download: `Miniconda3-py310_XX.X.X-Linux-x86_64.sh`
+        
+        ```bash
+        bash Miniconda3-py310_XX.X.X-Linux-x86_64.sh
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Create Conda Environment">
+    Open your terminal and create a new environment:
+
+    ```bash
+    conda create -n thellmbook python=3.10
+    ```
+
+    Activate the environment:
+
+    ```bash
+    conda activate thellmbook
+    ```
+
+    <Tip>
+    You'll need to activate this environment every time you want to work with the notebooks.
+    </Tip>
+  </Step>
+
+  <Step title="Clone the Repository">
+    Clone the Hands-On LLMs repository:
+
+    ```bash
+    git clone https://github.com/HandsOnLLM/Hands-On-Large-Language-Models.git
+    cd Hands-On-Large-Language-Models
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    You have two options for installing dependencies:
+
+    <Tabs>
+      <Tab title="Option 1: Complete Environment (Recommended)">
+        Install all dependencies at once using the environment file:
+
+        ```bash
+        conda env create -f environment.yml
+        ```
+
+        This creates the complete environment with all pinned dependencies.
+      </Tab>
+      <Tab title="Option 2: From requirements.txt">
+        If you already created an environment, install packages with pip:
+
+        ```bash
+        pip install -r requirements.txt
+        ```
+
+        <Warning>
+        On Windows, this requires **Microsoft Visual C++ 14.0** or greater. See troubleshooting below if you encounter C++ errors.
+        </Warning>
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Install PyTorch with GPU Support">
+    For optimal performance, install the GPU version of PyTorch:
+
+    Visit [pytorch.org](https://pytorch.org/) and select your configuration, then run the command. For example, with CUDA 11.8:
+
+    ```bash
+    pip3 install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+    ```
+
+    <Note>
+    The `--upgrade` flag ensures the CPU version is replaced with the GPU version.
+    </Note>
+
+    Verify GPU is available:
+
+    ```python
+    import torch
+    print(f"GPU Available: {torch.cuda.is_available()}")
+    print(f"GPU Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None'}")
+    ```
+  </Step>
+
+  <Step title="Launch Jupyter Lab">
+    Start JupyterLab to access the notebooks:
+
+    ```bash
+    jupyter lab
+    ```
+
+    This will open JupyterLab in your browser. Navigate to the chapter folders to open notebooks.
+  </Step>
+</Steps>
+
+## Core Dependencies
+
+The following packages are installed as part of the setup:
+
+### Essential Libraries
+
+<CodeGroup>
+```txt PyTorch & Transformers
+torch == 2.3.1
+transformers == 4.41.2
+sentence-transformers == 3.0.1
+sentencepiece == 0.2.0
+```
+
+```txt Data Science
+numpy == 1.26.4
+pandas == 2.2.2
+scikit-learn == 1.5.0
+scipy >= 1.15.0
+```
+
+```txt Visualization
+matplotlib == 3.9.0
+datamapplot == 0.3.0
+```
+
+```txt NLP Tools
+nltk == 3.8.1
+evaluate == 0.4.2
+datasets == 2.20.0
+```
+</CodeGroup>
+
+### Chapter-Specific Dependencies
+
+Some chapters require additional packages:
+
+```txt
+# Chapter 5: Topic Modeling
+bertopic == 0.16.3
+
+# Chapter 7: Local LLMs
+llama_cpp_python == 0.2.78
+
+# Chapter 8: Semantic Search & RAG
+faiss-cpu == 1.8.0
+annoy == 1.17.3
+langchain == 0.2.5
+langchain-openai == 0.1.8
+
+# Chapter 10-12: Fine-tuning
+peft == 0.11.1
+trl == 0.9.4
+accelerate == 0.31.0
+bitsandbytes == 0.43.1
+```
+
+## GPU Requirements
+
+### Minimum Requirements
+
+<CardGroup cols={2}>
+  <Card title="Free Tier (Colab)" icon="cloud">
+    **GPU**: NVIDIA T4
+    
+    **VRAM**: 16GB
+    
+    **Cost**: Free
+    
+    Sufficient for: All book examples
+  </Card>
+  <Card title="Local Development" icon="laptop">
+    **GPU**: NVIDIA RTX 3060 or better
+    
+    **VRAM**: 12GB minimum, 16GB+ recommended
+    
+    **Cost**: Hardware dependent
+    
+    Sufficient for: All examples plus experimentation
+  </Card>
+</CardGroup>
+
+### Cloud Provider Options
+
+If you don't have a local GPU, consider these cloud options:
+
+| Provider | GPU Options | VRAM | Approximate Cost | Best For |
+|----------|-------------|------|------------------|----------|
+| **Google Colab** | T4, A100 | 16GB - 40GB | Free - $10/month | Learning, prototyping |
+| **AWS SageMaker** | Various | Flexible | Pay per hour | Production, scaling |
+| **Paperspace** | RTX 4000+ | 8GB - 48GB | $0.50+/hour | Development |
+| **Lambda Labs** | A100, H100 | 40GB - 80GB | $1.10+/hour | Training, fine-tuning |
+| **RunPod** | Various | Flexible | $0.20+/hour | Cost-effective compute |
+
+<Tip>
+Google Colab's free T4 GPU (16GB VRAM) is sufficient for all examples in the book and is our recommended starting point.
+</Tip>
+
+## Alternative: Quick Setup with pip
+
+If you already have Python 3.10 installed and prefer not to use Conda:
+
+```bash
+# Clone the repository
+git clone https://github.com/HandsOnLLM/Hands-On-Large-Language-Models.git
+cd Hands-On-Large-Language-Models
+
+# Create a virtual environment
+python -m venv venv
+
+# Activate it
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+
+# Install dependencies
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# Install PyTorch with GPU support
+pip3 install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+
+## Troubleshooting Common Issues
+
+### Microsoft Visual C++ Error
+
+If you see: `error: Microsoft Visual C++ 14.0 or greater is required.`
+
+<Steps>
+  <Step title="Download Build Tools">
+    Download [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+  </Step>
+  <Step title="Install Desktop Development with C++">
+    Run the installer and select "Desktop development with C++"
+  </Step>
+  <Step title="Restart Terminal">
+    Close and reopen your terminal, then try installing again
+  </Step>
+</Steps>
+
+**Alternative**: Use Conda which handles C++ dependencies automatically:
+
+```bash
+conda env create -f environment.yml
+```
+
+### CUDA/GPU Not Detected
+
+If PyTorch can't detect your GPU:
+
+1. **Check NVIDIA driver**:
+   ```bash
+   nvidia-smi
+   ```
+   If this fails, install/update your NVIDIA drivers.
+
+2. **Verify PyTorch CUDA version matches your driver**:
+   ```python
+   import torch
+   print(f"PyTorch version: {torch.__version__}")
+   print(f"CUDA available: {torch.cuda.is_available()}")
+   print(f"CUDA version: {torch.version.cuda}")
+   ```
+
+3. **Reinstall PyTorch with correct CUDA version**:
+   Visit [pytorch.org](https://pytorch.org/) and select the CUDA version matching your driver.
+
+### Out of Memory Errors
+
+If you encounter GPU out-of-memory errors:
+
+```python
+# Clear GPU cache
+import torch
+torch.cuda.empty_cache()
+
+# Reduce batch size in training examples
+batch_size = 8  # Try reducing to 4 or 2
+
+# Use gradient accumulation
+accumulation_steps = 4  # Effective batch size = batch_size * accumulation_steps
+```
+
+### Package Conflicts
+
+If you encounter dependency conflicts:
+
+```bash
+# Create a fresh environment
+conda deactivate
+conda env remove -n thellmbook
+conda env create -f environment.yml
+
+# Or update pip
+pip install --upgrade pip
+pip install -r requirements.txt --force-reinstall
+```
+
+### Import Errors
+
+If imports fail after installation:
+
+```bash
+# Ensure environment is activated
+conda activate thellmbook
+
+# Verify package installation
+pip list | grep transformers
+pip list | grep torch
+
+# Reinstall specific package
+pip install --upgrade transformers
+```
+
+## Verifying Your Installation
+
+Run this verification script to check your setup:
+
+```python
+import sys
+import torch
+import transformers
+import sentence_transformers
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+print("=" * 50)
+print("Environment Verification")
+print("=" * 50)
+
+print(f"Python version: {sys.version.split()[0]}")
+print(f"PyTorch version: {torch.__version__}")
+print(f"Transformers version: {transformers.__version__}")
+print(f"Sentence-Transformers version: {sentence_transformers.__version__}")
+
+print("\nGPU Information:")
+if torch.cuda.is_available():
+    print(f"  ✓ GPU Available: {torch.cuda.get_device_name(0)}")
+    print(f"  ✓ CUDA Version: {torch.version.cuda}")
+    print(f"  ✓ GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+else:
+    print("  ✗ No GPU detected - running on CPU")
+    print("  Note: A GPU is highly recommended for most examples")
+
+print("\nCore Libraries:")
+libraries = [
+    ("NumPy", np.__version__),
+    ("Pandas", pd.__version__),
+    ("Matplotlib", plt.matplotlib.__version__),
+]
+
+for lib, version in libraries:
+    print(f"  ✓ {lib}: {version}")
+
+print("\n" + "=" * 50)
+print("Setup complete! You're ready to start.")
+print("=" * 50)
+```
+
+Expected output:
+
+```
+==================================================
+Environment Verification
+==================================================
+Python version: 3.10.14
+PyTorch version: 2.3.1
+Transformers version: 4.41.2
+Sentence-Transformers version: 3.0.1
+
+GPU Information:
+  ✓ GPU Available: NVIDIA GeForce RTX 3090
+  ✓ CUDA Version: 11.8
+  ✓ GPU Memory: 24.00 GB
+
+Core Libraries:
+  ✓ NumPy: 1.26.4
+  ✓ Pandas: 2.2.2
+  ✓ Matplotlib: 3.9.0
+
+==================================================
+Setup complete! You're ready to start.
+==================================================
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Run Your First Notebook" icon="rocket" href="/quickstart">
+    Jump into Chapter 1 and start learning
+  </Card>
+  <Card title="Browse All Chapters" icon="book" href="/introduction">
+    Explore the complete table of contents
+  </Card>
+  <Card title="Fundamentals" icon="brain" href="/fundamentals/language-models">
+    Start with language model basics
+  </Card>
+  <Card title="Join Community" icon="users" href="https://github.com/HandsOnLLM/Hands-On-Large-Language-Models">
+    Get help and share your projects
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [PyTorch Installation Guide](https://pytorch.org/get-started/locally/)
+- [Hugging Face Transformers Documentation](https://huggingface.co/docs/transformers/)
+- [CUDA Installation Guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/)
+- [Conda Cheat Sheet](https://docs.conda.io/projects/conda/en/latest/user-guide/cheatsheet.html)
+
+<Note>
+Note: Depending on your OS, Python version, and dependencies, your results might differ slightly from the book examples. However, they should be similar in essence and functionality.
+</Note>

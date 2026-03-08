@@ -1,0 +1,590 @@
+---
+title: Fine-Tuning BERT for Classification
+description: Master supervised fine-tuning of BERT models for text classification with practical examples
+icon: tags
+---
+
+## Overview
+
+Fine-tuning BERT (Bidirectional Encoder Representations from Transformers) for classification involves adapting a pre-trained language model to your specific classification task. This chapter covers full fine-tuning, parameter-efficient methods, and few-shot learning techniques.
+
+<Note>
+BERT models excel at classification tasks because they understand bidirectional context. Fine-tuning requires minimal data (often 100-1000 examples) compared to training from scratch.
+</Note>
+
+## When to Use This Technique
+
+Fine-tune BERT for classification when you need:
+
+- **High Accuracy**: BERT consistently outperforms traditional ML methods
+- **Limited Data**: Effective with as few as 100-1000 labeled examples
+- **Multi-Class Classification**: Handles 2 to 100+ classes efficiently
+- **Contextual Understanding**: Tasks requiring deep semantic understanding (sentiment, intent, topic classification)
+- **Fast Development**: Pre-trained models accelerate development vs. training from scratch
+
+## GPU Requirements
+
+<Warning>
+**Minimum Requirements**: T4 GPU with 16GB VRAM
+
+- Full fine-tuning (BERT-base): ~1 minute per epoch (8K samples)
+- Frozen layers: ~15 seconds per epoch
+- Few-shot (SetFit): ~2-3 minutes for 8-shot learning
+- Batch size: 16 (full), can increase to 32 with frozen layers
+</Warning>
+
+## Dataset Preparation
+
+Classification datasets require text and corresponding labels:
+
+```python
+from datasets import load_dataset
+
+# Load dataset (using Rotten Tomatoes as example)
+tomatoes = load_dataset("rotten_tomatoes")
+train_data, test_data = tomatoes["train"], tomatoes["test"]
+
+# Dataset structure:
+# {
+#   'text': 'the film provides some great insight...',
+#   'label': 1  # 0=negative, 1=positive
+# }
+
+print(f"Training samples: {len(train_data)}")
+# Output: Training samples: 8530
+print(f"Test samples: {len(test_data)}")
+# Output: Test samples: 1066
+```
+
+### Data Requirements
+
+| Approach | Minimum Samples | Recommended | Training Time |
+|----------|----------------|-------------|---------------|
+| Full Fine-Tuning | 1,000 | 5,000+ | 1-5 minutes |
+| Frozen Layers | 500 | 2,000+ | 30 seconds |
+| Few-Shot (SetFit) | 8 per class | 64 per class | 2-3 minutes |
+
+## Full Supervised Fine-Tuning
+
+<Steps>
+
+<Step title="Load Model and Tokenizer">
+
+```python
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+model_id = "bert-base-cased"
+
+# Load pre-trained model with classification head
+model = AutoModelForSequenceClassification.from_pretrained(
+    model_id,
+    num_labels=2  # Number of classes
+)
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+```
+
+<Tip>
+The classifier head (final layer) is randomly initialized. The warning "Some weights...were not initialized" is expected and normal.
+</Tip>
+
+</Step>
+
+<Step title="Tokenize Data">
+
+```python
+from transformers import DataCollatorWithPadding
+
+# Pad to longest sequence in batch (memory efficient)
+data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+def preprocess_function(examples):
+    """Tokenize input text"""
+    return tokenizer(examples["text"], truncation=True)
+
+# Apply tokenization
+tokenized_train = train_data.map(preprocess_function, batched=True)
+tokenized_test = test_data.map(preprocess_function, batched=True)
+```
+
+**Key Parameters**:
+- `truncation=True`: Truncates to max sequence length (512 tokens)
+- `batched=True`: Processes multiple examples at once (faster)
+- Dynamic padding: Only pads to longest in batch (saves memory)
+
+</Step>
+
+<Step title="Define Evaluation Metrics">
+
+```python
+import numpy as np
+import evaluate
+
+def compute_metrics(eval_pred):
+    """Calculate F1 score for evaluation"""
+    logits, labels = eval_pred
+    predictions = np.argmax(logits, axis=-1)
+    
+    load_f1 = evaluate.load("f1")
+    f1 = load_f1.compute(predictions=predictions, references=labels)["f1"]
+    return {"f1": f1}
+```
+
+</Step>
+
+<Step title="Configure Training">
+
+```python
+from transformers import TrainingArguments, Trainer
+
+# Training hyperparameters
+training_args = TrainingArguments(
+    "model",
+    learning_rate=2e-5,
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
+    num_train_epochs=1,
+    weight_decay=0.01,
+    save_strategy="epoch",
+    report_to="none"
+)
+
+# Initialize trainer
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized_train,
+    eval_dataset=tokenized_test,
+    tokenizer=tokenizer,
+    data_collator=data_collator,
+    compute_metrics=compute_metrics,
+)
+```
+
+**Hyperparameter Guide**:
+
+| Parameter | Value | Purpose |
+|-----------|-------|----------|
+| `learning_rate` | 2e-5 | Standard for BERT fine-tuning |
+| `batch_size` | 16 | Balance speed and memory |
+| `num_train_epochs` | 1-3 | More epochs risk overfitting |
+| `weight_decay` | 0.01 | Regularization to prevent overfitting |
+
+</Step>
+
+<Step title="Train and Evaluate">
+
+```python
+# Train model
+trainer.train()
+
+# Expected output:
+# [534/534 01:00, Epoch 1/1]
+# Step | Training Loss
+# 500  | 0.424
+
+# Evaluate on test set
+results = trainer.evaluate()
+print(results)
+
+# Output:
+# {
+#   'eval_loss': 0.371,
+#   'eval_f1': 0.857,
+#   'eval_runtime': 3.1,
+#   'eval_samples_per_second': 342.4
+# }
+```
+
+**Expected Performance**:
+- **F1 Score**: 0.85+ on Rotten Tomatoes
+- **Training Time**: ~1 minute per epoch
+- **Training Loss**: Starts at ~0.42, final ~0.37
+
+</Step>
+
+</Steps>
+
+## Parameter-Efficient Fine-Tuning
+
+### Freezing Layers
+
+Freeze lower layers to train faster with less data:
+
+```python
+# Reload model
+model = AutoModelForSequenceClassification.from_pretrained(model_id, num_labels=2)
+
+# Freeze all layers except classifier
+for name, param in model.named_parameters():
+    if name.startswith("classifier"):
+        param.requires_grad = True  # Train classifier
+    else:
+        param.requires_grad = False  # Freeze base model
+
+# Verify configuration
+for name, param in model.named_parameters():
+    print(f"{name}: {param.requires_grad}")
+
+# Output:
+# bert.embeddings.word_embeddings.weight: False
+# ...
+# classifier.weight: True
+# classifier.bias: True
+```
+
+**Training Results**:
+
+```python
+trainer = Trainer(model=model, args=training_args, ...)
+trainer.train()
+
+# Training time: ~15 seconds (4x faster)
+# Eval F1: 0.638 (vs 0.857 full fine-tuning)
+```
+
+<Tabs>
+
+<Tab title="Freeze All Except Classifier">
+
+**Use When**: Very limited data (&lt;500 examples)
+
+```python
+for name, param in model.named_parameters():
+    if name.startswith("classifier"):
+        param.requires_grad = True
+    else:
+        param.requires_grad = False
+```
+
+**Performance**: F1 ~0.64, trains in 15 seconds
+
+</Tab>
+
+<Tab title="Freeze First Half">
+
+**Use When**: Moderate data (500-2000 examples)
+
+```python
+# Freeze layers 0-5, train 6-11 + classifier
+for name, param in model.named_parameters():
+    if "layer.0" in name or "layer.1" in name or \
+       "layer.2" in name or "layer.3" in name or \
+       "layer.4" in name or "layer.5" in name:
+        param.requires_grad = False
+    else:
+        param.requires_grad = True
+```
+
+**Performance**: F1 ~0.78, trains in 30 seconds
+
+</Tab>
+
+<Tab title="Full Fine-Tuning">
+
+**Use When**: Sufficient data (2000+ examples)
+
+```python
+# Train all parameters (default)
+# No freezing needed
+```
+
+**Performance**: F1 ~0.86, trains in 1 minute
+
+</Tab>
+
+</Tabs>
+
+### Comparison of Approaches
+
+| Method | F1 Score | Training Time | Trainable Params |
+|--------|----------|---------------|------------------|
+| Full Fine-Tuning | 0.857 | 60s | 108M (100%) |
+| Freeze Layers 0-5 | 0.780 | 30s | 54M (50%) |
+| Freeze All Except Classifier | 0.638 | 15s | 1.5K (0.001%) |
+
+## Few-Shot Learning with SetFit
+
+SetFit enables classification with just 8-64 examples per class:
+
+```python
+from setfit import SetFitModel, SetFitTrainer
+from sentence_transformers.losses import CosineSimilarityLoss
+
+# Sample 8 examples per class
+train_dataset = dataset.train_test_split(
+    train_size=8, 
+    stratify_by_column="label"
+)["train"]
+
+print(f"Training with {len(train_dataset)} examples")
+# Output: Training with 16 examples (8 per class)
+
+# Load SetFit model
+model = SetFitModel.from_pretrained(
+    "sentence-transformers/paraphrase-mpnet-base-v2"
+)
+
+# Configure trainer
+trainer = SetFitTrainer(
+    model=model,
+    train_dataset=train_dataset,
+    eval_dataset=test_dataset,
+    loss_class=CosineSimilarityLoss,
+    num_iterations=20,  # Fine-tuning iterations
+    column_mapping={"text": "text", "label": "label"}
+)
+
+# Train
+trainer.train()
+
+# Evaluate
+metrics = trainer.evaluate()
+print(metrics)
+
+# With 8 examples per class:
+# {'accuracy': 0.78}
+
+# With 64 examples per class:
+# {'accuracy': 0.86}
+```
+
+**Few-Shot Performance**:
+
+| Examples per Class | Accuracy | Training Time |
+|-------------------|----------|---------------|
+| 8 | 0.78 | 2 minutes |
+| 16 | 0.82 | 2.5 minutes |
+| 64 | 0.86 | 3 minutes |
+| Full (4265/class) | 0.86 | 1 minute |
+
+<Tip>
+SetFit achieves similar performance to full fine-tuning with 100x less data. Ideal for rapid prototyping or when labeling is expensive.
+</Tip>
+
+## Advanced: Named Entity Recognition
+
+BERT also excels at token-level classification:
+
+```python
+from transformers import AutoModelForTokenClassification
+
+# Load model for NER
+model = AutoModelForTokenClassification.from_pretrained(
+    "bert-base-cased",
+    num_labels=9  # BIO format for 4 entity types
+)
+
+# Example labels: O, B-PER, I-PER, B-ORG, I-ORG, B-LOC, I-LOC, B-MISC, I-MISC
+
+# Training is similar but requires token-level alignment
+# See full notebook for complete implementation
+```
+
+## Evaluation Metrics
+
+### Classification Metrics
+
+```python
+from sklearn.metrics import classification_report
+
+# Get predictions
+predictions = trainer.predict(tokenized_test)
+preds = np.argmax(predictions.predictions, axis=-1)
+
+# Detailed metrics
+print(classification_report(
+    tokenized_test["label"],
+    preds,
+    target_names=["negative", "positive"]
+))
+
+# Output:
+#               precision  recall  f1-score  support
+#    negative       0.84    0.87      0.85      533
+#    positive       0.87    0.84      0.86      533
+#    accuracy                         0.86     1066
+```
+
+### Confusion Matrix
+
+```python
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+cm = confusion_matrix(tokenized_test["label"], preds)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.ylabel('True Label')
+plt.xlabel('Predicted Label')
+plt.show()
+```
+
+## Hyperparameter Tuning
+
+Key hyperparameters to experiment with:
+
+```python
+training_args = TrainingArguments(
+    output_dir="model",
+    
+    # Learning rate (try: 1e-5, 2e-5, 3e-5, 5e-5)
+    learning_rate=2e-5,
+    
+    # Batch size (adjust based on VRAM)
+    per_device_train_batch_size=16,
+    
+    # Epochs (try: 1, 2, 3)
+    num_train_epochs=3,
+    
+    # Regularization
+    weight_decay=0.01,
+    
+    # Learning rate schedule
+    lr_scheduler_type="linear",  # or "cosine"
+    warmup_ratio=0.1,
+    
+    # Evaluation
+    evaluation_strategy="epoch",
+    save_strategy="epoch",
+    load_best_model_at_end=True,
+    metric_for_best_model="f1",
+)
+```
+
+**Tuning Guide**:
+
+1. **Start with defaults**: `lr=2e-5`, `epochs=3`, `batch_size=16`
+2. **If overfitting**: Increase `weight_decay`, decrease `epochs`, add dropout
+3. **If underfitting**: Increase `epochs`, increase model size, reduce `weight_decay`
+4. **If OOM**: Decrease `batch_size`, use gradient accumulation
+
+## Deployment
+
+### Save and Load Model
+
+```python
+# Save fine-tuned model
+model.save_pretrained("my_sentiment_model")
+tokenizer.save_pretrained("my_sentiment_model")
+
+# Load for inference
+from transformers import pipeline
+
+classifier = pipeline(
+    "text-classification",
+    model="my_sentiment_model",
+    tokenizer="my_sentiment_model"
+)
+
+# Predict
+result = classifier("This movie was fantastic!")
+print(result)
+# [{'label': 'POSITIVE', 'score': 0.9834}]
+```
+
+### Optimize for Production
+
+```python
+# Quantize to INT8 (4x smaller, 2x faster)
+from optimum.onnxruntime import ORTModelForSequenceClassification
+
+model = ORTModelForSequenceClassification.from_pretrained(
+    "my_sentiment_model",
+    export=True,
+    provider="CPUExecutionProvider"
+)
+
+# 10-20x faster inference on CPU
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+
+<Accordion title="Model not learning (loss not decreasing)">
+
+**Symptoms**: Training loss stays constant
+
+**Solutions**:
+- Check label format (must be integers, not strings)
+- Verify `num_labels` matches number of classes
+- Reduce learning rate (try 1e-5)
+- Ensure data is shuffled
+- Check for class imbalance
+
+</Accordion>
+
+<Accordion title="Overfitting (train accuracy >> test accuracy)">
+
+**Symptoms**: High training F1, low test F1
+
+**Solutions**:
+- Reduce number of epochs
+- Increase `weight_decay` to 0.1
+- Use fewer trainable layers (freeze lower layers)
+- Add more training data
+- Use data augmentation
+
+</Accordion>
+
+<Accordion title="Out of memory errors">
+
+**Symptoms**: CUDA OOM
+
+**Solutions**:
+```python
+training_args = TrainingArguments(
+    per_device_train_batch_size=8,  # Reduce from 16
+    gradient_accumulation_steps=2,  # Effective batch size = 16
+    fp16=True,  # Use mixed precision
+)
+```
+
+</Accordion>
+
+<Accordion title="Slow training">
+
+**Symptoms**: Takes longer than expected
+
+**Solutions**:
+- Enable fp16: `fp16=True`
+- Increase batch size if VRAM allows
+- Use smaller model (distilbert)
+- Check GPU utilization: `nvidia-smi`
+- Use gradient checkpointing for memory
+
+</Accordion>
+
+</AccordionGroup>
+
+## Full Colab Notebook
+
+<Card
+  title="Chapter 11: Fine-Tuning BERT for Classification"
+  icon="google"
+  href="https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter11/Chapter%2011%20-%20Fine-Tuning%20BERT.ipynb"
+>
+  Complete code for full fine-tuning, frozen layers, few-shot learning, and NER
+</Card>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card
+  title="Fine-Tuning Generation Models"
+  icon="wand-magic-sparkles"
+  href="/development/fine-tuning-generation"
+>
+  Learn to fine-tune LLMs for text generation tasks
+</Card>
+
+<Card
+  title="Text Classification"
+  icon="list-check"
+  href="/applications/text-classification"
+>
+  Explore classification use cases and architectures
+</Card>
+
+</CardGroup>

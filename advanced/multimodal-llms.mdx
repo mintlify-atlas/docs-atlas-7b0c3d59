@@ -1,0 +1,571 @@
+---
+title: "Multimodal LLMs"
+description: "Work with vision-language models like CLIP and BLIP-2 for image understanding"
+icon: "images"
+---
+
+Multimodal Large Language Models combine vision and language capabilities, enabling applications like image captioning, visual question answering, and zero-shot image classification. Learn to use CLIP for image-text matching and BLIP-2 for visual reasoning.
+
+## Overview
+
+Multimodal LLMs process and generate content across different modalities:
+- **Vision + Language**: CLIP, BLIP-2, LLaVA, GPT-4V
+- **Audio + Language**: Whisper, AudioLM
+- **Video + Language**: VideoLLM, Flamingo
+
+**Key applications:**
+- Image captioning and description
+- Visual question answering (VQA)
+- Zero-shot image classification
+- Image-guided text generation
+- Content moderation
+- Visual search
+
+## CLIP: Connecting Vision and Language
+
+CLIP (Contrastive Language-Image Pre-training) learns joint embeddings for images and text, enabling powerful cross-modal understanding.
+
+### Architecture
+
+```
+┌─────────────┐          ┌─────────────┐
+│   Image     │          │    Text     │
+│   Encoder   │          │   Encoder   │
+│  (ViT/CNN)  │          │    (BERT)   │
+└──────┬──────┘          └──────┬──────┘
+       │                        │
+       │                        │
+       ▼                        ▼
+  Image Embedding          Text Embedding
+       │                        │
+       └────────┬───────────────┘
+                │
+                ▼
+         Cosine Similarity
+```
+
+### Loading CLIP
+
+```python
+from transformers import CLIPTokenizerFast, CLIPProcessor, CLIPModel
+from PIL import Image
+from urllib.request import urlopen
+
+model_id = "openai/clip-vit-base-patch32"
+
+# Load components
+clip_tokenizer = CLIPTokenizerFast.from_pretrained(model_id)
+clip_processor = CLIPProcessor.from_pretrained(model_id)
+model = CLIPModel.from_pretrained(model_id)
+
+# Load sample image
+puppy_path = "https://raw.githubusercontent.com/HandsOnLLM/Hands-On-Large-Language-Models/main/chapter09/images/puppy.png"
+image = Image.open(urlopen(puppy_path)).convert("RGB")
+caption = "a puppy playing in the snow"
+```
+
+### Text Embeddings
+
+```python
+# Tokenize text
+inputs = clip_tokenizer(caption, return_tensors="pt")
+print(inputs)
+# Output: {'input_ids': tensor([[49406, 320, 6829, 1629, 530, 518, 2583, 49407]]), 
+#          'attention_mask': tensor([[1, 1, 1, 1, 1, 1, 1, 1]])}
+
+# View tokens
+print(clip_tokenizer.convert_ids_to_tokens(inputs["input_ids"][0]))
+# Output: ['<|startoftext|>', 'a</w>', 'puppy</w>', 'playing</w>', 
+#          'in</w>', 'the</w>', 'snow</w>', '<|endoftext|>']
+
+# Create text embedding
+text_embedding = model.get_text_features(**inputs)
+print(text_embedding.shape)  # torch.Size([1, 512])
+```
+
+### Image Embeddings
+
+```python
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Preprocess image
+processed_image = clip_processor(
+    text=None, 
+    images=image, 
+    return_tensors='pt'
+)['pixel_values']
+
+print(processed_image.shape)  # torch.Size([1, 3, 224, 224])
+
+# Visualize preprocessed image
+img = processed_image.squeeze(0).permute(1, 2, 0)
+plt.imshow(img)
+plt.axis('off')
+plt.show()
+
+# Create image embedding
+image_embedding = model.get_image_features(processed_image)
+print(image_embedding.shape)  # torch.Size([1, 512])
+```
+
+### Computing Similarity
+
+```python
+# Normalize embeddings
+text_embedding /= text_embedding.norm(dim=-1, keepdim=True)
+image_embedding /= image_embedding.norm(dim=-1, keepdim=True)
+
+# Calculate similarity
+text_embedding = text_embedding.detach().cpu().numpy()
+image_embedding = image_embedding.detach().cpu().numpy()
+score = text_embedding @ image_embedding.T
+
+print(f"Similarity: {score[0][0]:.4f}")
+# Output: Similarity: 0.3315
+```
+
+<Note>
+CLIP embeddings are 512-dimensional by default. Higher similarity scores (closer to 1.0) indicate better semantic alignment between image and text.
+</Note>
+
+## Zero-Shot Image Classification
+
+Use CLIP to classify images without training:
+
+```python
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Multiple images and captions
+images = [
+    Image.open(urlopen(path)).convert("RGB")
+    for path in [puppy_path, cat_path, car_path]
+]
+
+captions = [
+    "a puppy playing in the snow",
+    "a pixelated image of a cute cat",
+    "A supercar on the road with the sunset in the background"
+]
+
+# Embed all images
+image_embeddings = []
+for image in images:
+    image_processed = clip_processor(images=image, return_tensors='pt')['pixel_values']
+    image_embedding = model.get_image_features(image_processed).detach().cpu().numpy()[0]
+    image_embeddings.append(image_embedding)
+image_embeddings = np.array(image_embeddings)
+
+# Embed all captions
+text_embeddings = []
+for caption in captions:
+    inputs = clip_tokenizer(caption, return_tensors="pt")
+    text_emb = model.get_text_features(**inputs).detach().cpu().numpy()[0]
+    text_embeddings.append(text_emb)
+text_embeddings = np.array(text_embeddings)
+
+# Calculate similarity matrix
+sim_matrix = cosine_similarity(image_embeddings, text_embeddings)
+print(sim_matrix)
+```
+
+**Output:**
+```
+[[0.33  0.19  0.11]   # Puppy image: highest match with "puppy" caption
+ [0.15  0.35  0.09]   # Cat image: highest match with "cat" caption
+ [0.08  0.13  0.31]]  # Car image: highest match with "car" caption
+```
+
+<Tip>
+Diagonal values are highest, showing CLIP correctly matches each image with its corresponding caption!
+</Tip>
+
+### Visualizing Similarity
+
+```python
+plt.figure(figsize=(20, 14))
+plt.imshow(sim_matrix, cmap='viridis')
+
+# Add image thumbnails
+for i, image in enumerate(images):
+    plt.imshow(image, extent=(i - 0.5, i + 0.5, -1.6, -0.6), origin="lower")
+
+# Add similarity scores
+for x in range(sim_matrix.shape[1]):
+    for y in range(sim_matrix.shape[0]):
+        plt.text(x, y, f"{sim_matrix[y, x]:.2f}", 
+                ha="center", va="center", size=30)
+
+plt.yticks(range(len(captions)), captions, fontsize=18)
+plt.xlim([-0.5, len(captions) - 0.5])
+plt.ylim([len(captions) + 0.5, -2])
+plt.show()
+```
+
+## Sentence-BERT Integration
+
+Use CLIP with the Sentence-Transformers library:
+
+```python
+from sentence_transformers import SentenceTransformer, util
+
+# Load SBERT-compatible CLIP
+model = SentenceTransformer('clip-ViT-B-32')
+
+# Encode images and text together
+image_embeddings = model.encode(images)
+text_embeddings = model.encode(captions)
+
+# Compute similarities
+sim_matrix = util.cos_sim(image_embeddings, text_embeddings)
+print(sim_matrix)
+```
+
+<CodeGroup>
+```python Transformers
+from transformers import CLIPModel, CLIPProcessor
+
+model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+inputs = processor(text=captions, images=images, return_tensors="pt", padding=True)
+outputs = model(**inputs)
+logits_per_image = outputs.logits_per_image
+```
+
+```python Sentence-Transformers
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer('clip-ViT-B-32')
+
+image_embeddings = model.encode(images)
+text_embeddings = model.encode(captions)
+similarity = util.cos_sim(image_embeddings, text_embeddings)
+```
+</CodeGroup>
+
+## BLIP-2: Visual Reasoning
+
+BLIP-2 (Bootstrapping Language-Image Pre-training) enables visual question answering and image captioning.
+
+### Architecture
+
+```
+┌─────────────┐
+│   Image     │
+│   Encoder   │
+│   (ViT)     │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│   Q-Former  │  ← Learnable queries bridge vision and language
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│    LLM      │
+│  (OPT/FLAN) │
+└─────────────┘
+```
+
+### Loading BLIP-2
+
+```python
+from transformers import Blip2Processor, Blip2ForConditionalGeneration
+import torch
+
+# Load BLIP-2 with OPT-2.7B
+processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
+model = Blip2ForConditionalGeneration.from_pretrained(
+    "Salesforce/blip2-opt-2.7b",
+    torch_dtype=torch.float16
+)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model.to(device)
+```
+
+<Note>
+BLIP-2 models are large (several GB). The model uses float16 to reduce memory usage.
+</Note>
+
+### Image Captioning
+
+```python
+# Load image
+image = Image.open(urlopen(puppy_path)).convert("RGB")
+
+# Prepare inputs
+inputs = processor(images=image, return_tensors="pt").to(device, torch.float16)
+
+# Generate caption
+generated_ids = model.generate(**inputs)
+caption = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+
+print(f"Caption: {caption}")
+# Output: "Caption: a dog playing in the snow"
+```
+
+### Visual Question Answering
+
+```python
+# Ask questions about the image
+questions = [
+    "What animal is in the image?",
+    "What is the weather like?",
+    "What is the dog doing?"
+]
+
+for question in questions:
+    # Prepare inputs with prompt
+    inputs = processor(
+        images=image, 
+        text=question, 
+        return_tensors="pt"
+    ).to(device, torch.float16)
+    
+    # Generate answer
+    generated_ids = model.generate(**inputs, max_length=50)
+    answer = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+    
+    print(f"Q: {question}")
+    print(f"A: {answer}\n")
+```
+
+**Output:**
+```
+Q: What animal is in the image?
+A: dog
+
+Q: What is the weather like?
+A: snowy
+
+Q: What is the dog doing?
+A: playing in the snow
+```
+
+### Custom Prompting
+
+```python
+# Guided generation with prompts
+prompt = "Question: Describe the scene in detail. Answer:"
+
+inputs = processor(
+    images=image, 
+    text=prompt, 
+    return_tensors="pt"
+).to(device, torch.float16)
+
+generated_ids = model.generate(
+    **inputs,
+    max_length=100,
+    num_beams=5,  # Beam search for better quality
+    temperature=0.7
+)
+
+description = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+print(description)
+# Output: "A small white puppy playing joyfully in deep snow..."
+```
+
+## Advanced Patterns
+
+### Batch Processing
+
+```python
+# Process multiple images efficiently
+images = [Image.open(urlopen(path)).convert("RGB") for path in image_paths]
+
+inputs = processor(images=images, return_tensors="pt", padding=True).to(device)
+generated_ids = model.generate(**inputs)
+captions = processor.batch_decode(generated_ids, skip_special_tokens=True)
+
+for img_path, caption in zip(image_paths, captions):
+    print(f"{img_path}: {caption}")
+```
+
+### Image Search with CLIP
+
+<Steps>
+  <Step title="Index Images">
+    ```python
+    # Embed a database of images
+    image_database = [...]  # List of PIL Images
+    image_embeddings = model.encode(image_database)
+    
+    # Store in vector database (e.g., FAISS)
+    import faiss
+    index = faiss.IndexFlatL2(512)
+    index.add(np.float32(image_embeddings))
+    ```
+  </Step>
+  <Step title="Search with Text">
+    ```python
+    # Search with natural language
+    query = "a cat sitting on a couch"
+    query_embedding = model.encode([query])
+    
+    # Find most similar images
+    D, I = index.search(np.float32(query_embedding), k=5)
+    top_images = [image_database[i] for i in I[0]]
+    ```
+  </Step>
+  <Step title="Search with Image">
+    ```python
+    # Or search with another image
+    query_image = Image.open("query.jpg")
+    query_embedding = model.encode([query_image])
+    
+    D, I = index.search(np.float32(query_embedding), k=5)
+    similar_images = [image_database[i] for i in I[0]]
+    ```
+  </Step>
+</Steps>
+
+### Content Moderation
+
+```python
+def moderate_image(image, model):
+    """Classify image safety"""
+    categories = [
+        "safe for work",
+        "contains violence",
+        "contains adult content",
+        "contains hate symbols"
+    ]
+    
+    # Encode image and categories
+    image_emb = model.encode([image])
+    text_embs = model.encode(categories)
+    
+    # Compute similarities
+    similarities = util.cos_sim(image_emb, text_embs)[0]
+    
+    # Get prediction
+    pred_idx = similarities.argmax()
+    confidence = similarities[pred_idx].item()
+    
+    return categories[pred_idx], confidence
+
+category, confidence = moderate_image(image, model)
+print(f"Category: {category} (confidence: {confidence:.2f})")
+```
+
+## Integration Patterns
+
+<Tabs>
+  <Tab title="With LangChain">
+    ```python
+    from langchain.chains import TransformChain
+    from langchain_openai import ChatOpenAI
+    
+    def image_to_caption(inputs):
+        """Transform chain for image captioning"""
+        image_path = inputs["image_path"]
+        image = Image.open(image_path)
+        
+        # Generate caption with BLIP-2
+        inputs_blip = processor(images=image, return_tensors="pt")
+        generated_ids = model.generate(**inputs_blip)
+        caption = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+        
+        return {"caption": caption}
+    
+    # Create transform chain
+    caption_chain = TransformChain(
+        input_variables=["image_path"],
+        output_variables=["caption"],
+        transform=image_to_caption
+    )
+    
+    # Use in a larger pipeline
+    llm = ChatOpenAI(model="gpt-4")
+    result = caption_chain.invoke({"image_path": "photo.jpg"})
+    ```
+  </Tab>
+  <Tab title="With RAG">
+    ```python
+    # Visual RAG: Search images with text, answer with context
+    def visual_rag(query, image_database, model):
+        # 1. Retrieve relevant images
+        query_emb = model.encode([query])
+        D, I = image_index.search(query_emb, k=3)
+        relevant_images = [image_database[i] for i in I[0]]
+        
+        # 2. Generate captions for context
+        inputs = processor(images=relevant_images, return_tensors="pt")
+        captions = processor.batch_decode(
+            model.generate(**inputs),
+            skip_special_tokens=True
+        )
+        
+        # 3. Answer with LLM
+        context = "\n".join([f"Image {i+1}: {cap}" for i, cap in enumerate(captions)])
+        prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
+        
+        return llm(prompt)
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Image Preprocessing">
+    - Use consistent image sizes (224x224 for most models)
+    - Normalize with model-specific statistics
+    - Handle transparency (convert RGBA to RGB)
+    - Resize large images before processing
+  </Accordion>
+  <Accordion title="Prompt Engineering for Vision">
+    - Be specific in text prompts for better alignment
+    - Use descriptive captions for training data
+    - Test with diverse visual concepts
+    - Include context in questions for VQA
+  </Accordion>
+  <Accordion title="Performance">
+    - Batch process images when possible
+    - Use float16 for inference to reduce memory
+    - Cache embeddings for repeated queries
+    - Consider model distillation for deployment
+  </Accordion>
+</AccordionGroup>
+
+## Common Pitfalls
+
+<Warning>
+**Domain Shift**: CLIP/BLIP-2 may struggle with specialized domains (medical, satellite imagery). Fine-tune or use domain-specific models.
+</Warning>
+
+<Warning>
+**Bias**: Vision-language models can perpetuate biases from training data. Audit outputs carefully for sensitive applications.
+</Warning>
+
+<Warning>
+**Ambiguity**: Vague prompts lead to poor results. Be specific: "a golden retriever puppy" > "a dog".
+</Warning>
+
+<Warning>
+**Resolution Loss**: Downsampling to 224x224 loses fine details. Use larger variants (e.g., CLIP ViT-L/14@336px) for detail-critical tasks.
+</Warning>
+
+## Try It Yourself
+
+<Card title="Interactive Notebook" icon="flask" href="https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter09/Chapter%209%20-%20Multimodal%20Large%20Language%20Models.ipynb">
+  Explore CLIP and BLIP-2 with hands-on examples in this Colab notebook from Chapter 9.
+</Card>
+
+## Related Techniques
+
+<CardGroup cols={3}>
+  <Card title="Semantic Search" icon="magnifying-glass" href="/advanced/semantic-search-rag">
+    Apply visual search with CLIP
+  </Card>
+  <Card title="Prompt Engineering" icon="wand-magic-sparkles" href="/advanced/prompt-engineering">
+    Optimize visual prompts
+  </Card>
+  <Card title="Text Generation" icon="link" href="/advanced/text-generation">
+    Combine with generation pipelines
+  </Card>
+</CardGroup>

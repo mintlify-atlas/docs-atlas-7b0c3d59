@@ -1,0 +1,221 @@
+---
+title: A Visual Guide to Mixture of Experts
+description: Understand how MoE models achieve efficiency through specialized sub-networks
+---
+
+Mixture of Experts (MoE) represents one of the most exciting developments in transformer architecture. By incorporating multiple specialized sub-networks, MoE models can scale to enormous sizes while keeping computational costs manageable.
+
+<Card
+  title="A Visual Guide to Mixture of Experts (MoE)"
+  icon="users-gear"
+  href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mixture-of-experts"
+>
+  Read the full illustrated guide to MoE architectures
+</Card>
+
+## Why Mixture of Experts Matters
+
+As models grow larger, we face a fundamental challenge: bigger models perform better, but they're also slower and more expensive to run. MoE offers an elegant solution:
+
+- **Conditional computation**: Only activate parts of the model for each input
+- **Massive scale**: Models with hundreds of billions of parameters
+- **Constant cost**: Same inference cost regardless of total model size
+- **Specialization**: Different experts learn different types of patterns
+
+<Info>
+  MoE models can have 10x more parameters than dense models while using the same computational budget during inference.
+</Info>
+
+## What You'll Learn
+
+This visual guide provides a comprehensive exploration of MoE architectures:
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="diagram-project">
+    - Router networks
+    - Expert specialization
+    - Sparse activation
+    - Load balancing
+  </Card>
+  
+  <Card title="Advanced Topics" icon="rocket">
+    - Vision MoE models
+    - Multimodal applications
+    - Training dynamics
+    - Scaling laws
+  </Card>
+</CardGroup>
+
+## Key Concepts Explored
+
+### The MoE Architecture
+
+Understand the fundamental components:
+
+**Router Network**: A gating mechanism that decides which experts to activate for each token
+
+**Expert Networks**: Specialized feedforward networks, each learning different patterns
+
+**Sparse Activation**: Only a subset of experts (typically 1-2 out of 8-64) are active per token
+
+**Aggregation**: Combining outputs from active experts into a final result
+
+### How Routing Works
+
+The guide illustrates the routing process:
+
+1. **Input token** arrives at an MoE layer
+2. **Router network** computes expert scores
+3. **Top-k selection** picks the most relevant experts
+4. **Token processing** by selected experts
+5. **Weighted combination** of expert outputs
+
+<Note>
+  The router is learned during training, allowing experts to specialize in different types of inputs automatically.
+</Note>
+
+### Expert Specialization
+
+Experts naturally develop different specializations:
+
+- Some experts handle syntactic patterns
+- Others focus on semantic relationships
+- Certain experts specialize in specific domains or topics
+- Specialization emerges automatically during training
+
+### Load Balancing Challenges
+
+One key challenge in MoE training:
+
+- **Problem**: Some experts may be overused while others are neglected
+- **Impact**: Reduced model capacity and training instability
+- **Solution**: Auxiliary loss terms that encourage balanced expert usage
+- **Tradeoff**: Balancing expert diversity with routing accuracy
+
+## MoE in Modern LLMs
+
+Major models using MoE:
+
+- **GPT-4**: Rumored to use MoE architecture
+- **Mixtral**: Open-source MoE model from Mistral AI
+- **Switch Transformer**: Google's trillion-parameter model
+- **GLaM**: Efficient large-scale language model
+
+<CardGroup cols={2}>
+  <Card title="Mixtral 8x7B" icon="layer-group">
+    8 experts, each 7B parameters, but only 2 active per token = 13B active parameters
+  </Card>
+  
+  <Card title="Switch Transformer" icon="shuffle">
+    Up to 2048 experts, achieving 1.6 trillion total parameters
+  </Card>
+</CardGroup>
+
+## Vision MoE: Beyond Language
+
+The guide extends into vision models:
+
+- **Vision Transformers with MoE**: Applying MoE to image processing
+- **Multimodal models**: Combining language and vision experts
+- **Expert routing for patches**: Different image regions activate different experts
+- **Scalability**: Processing high-resolution images efficiently
+
+<Info>
+  Vision MoE models can handle higher resolution images than dense models by routing different image patches to specialized experts.
+</Info>
+
+## Training Dynamics
+
+Understand the unique challenges of training MoE models:
+
+### Initialization
+- Router networks need careful initialization
+- Experts should start relatively similar but diverge during training
+
+### Load Balancing Loss
+- Auxiliary objective to ensure all experts are used
+- Prevents router collapse to a few experts
+- Tuned to balance diversity and performance
+
+### Communication Overhead
+- In distributed training, tokens may need to be sent to different devices
+- Expert placement strategies matter for efficiency
+- Optimization for reduced communication costs
+
+## Practical Advantages
+
+When to consider MoE models:
+
+<CardGroup cols={2}>
+  <Card title="Scaling Efficiency" icon="arrow-up-right-dots">
+    Want model capacity without proportional inference cost
+  </Card>
+  
+  <Card title="Diverse Tasks" icon="list-check">
+    Need to handle wide variety of inputs effectively
+  </Card>
+  
+  <Card title="Large Datasets" icon="database">
+    Have sufficient data to train many specialized experts
+  </Card>
+  
+  <Card title="Inference Budget" icon="gauge-high">
+    Need to control computational costs at inference time
+  </Card>
+</CardGroup>
+
+## Visual Highlights
+
+The guide features detailed illustrations of:
+
+- MoE layer architecture within transformers
+- Router network decision-making process
+- Expert specialization patterns
+- Vision MoE for multimodal models
+- Load balancing mechanisms
+
+## How This Extends the Book
+
+**Chapter 3** covers transformer decoder fundamentals and efficient attention mechanisms. This guide builds upon that foundation by:
+
+- Introducing **sparse computation** through expert routing
+- Showing how to **scale beyond dense models**
+- Extending concepts to **multimodal scenarios**
+- Exploring **training dynamics** of sparse models
+
+<Note>
+  MoE represents a shift from "bigger is better" to "smarter activation is better" - a key principle for the next generation of models.
+</Note>
+
+## Prerequisites
+
+Before diving into this guide, you should have:
+
+- Read **Chapter 3** (Decoder-Based Language Models)
+- Understanding of transformer architecture
+- Familiarity with feedforward layers
+- Basic knowledge of routing mechanisms (helpful)
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Chapter 3: Transformers" icon="book" href="/fundamentals/transformer-architecture">
+    Understand the foundation transformer architecture
+  </Card>
+  
+  <Card title="DeepSeek-R1" icon="robot" href="/bonus/deepseek-r1">
+    See MoE in action in a reasoning model
+  </Card>
+  
+  <Card title="Quantization" icon="compress" href="/bonus/quantization">
+    Combine MoE with quantization for efficiency
+  </Card>
+  
+  <Card title="Vision Models" icon="image" href="/advanced/multimodal-llms">
+    Explore multimodal applications of MoE
+  </Card>
+</CardGroup>
+
+<Info>
+  Mixture of Experts is rapidly becoming the standard for very large models. Understanding MoE is essential for working with cutting-edge LLMs.
+</Info>

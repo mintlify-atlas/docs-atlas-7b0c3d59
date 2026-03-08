@@ -1,0 +1,612 @@
+---
+title: "Text Clustering & Topic Modeling"
+description: "Discover topics and clusters in text collections using embeddings, UMAP, HDBSCAN, and BERTopic"
+icon: "diagram-project"
+---
+
+# Text Clustering and Topic Modeling
+
+Text clustering groups similar documents together without predefined labels, making it ideal for exploratory analysis and discovering themes in large text collections. This chapter covers the complete pipeline from embeddings to topic modeling using modern techniques.
+
+<Note>
+This chapter uses **44,949 ArXiv abstracts** from the Computation and Language category to demonstrate clustering and topic modeling at scale.
+</Note>
+
+## Overview
+
+Text clustering and topic modeling help you:
+
+- **Discover themes** in large document collections
+- **Organize documents** without manual labeling
+- **Understand dataset structure** through visualization
+- **Extract interpretable topics** with representative keywords
+- **Track topic evolution** over time
+
+## Dataset Setup
+
+Load the ArXiv NLP papers dataset:
+
+```python
+from datasets import load_dataset
+
+# Load ArXiv abstracts (Computation and Language)
+dataset = load_dataset("maartengr/arxiv_nlp")["train"]
+
+# Extract metadata
+abstracts = list(dataset["Abstracts"])
+titles = list(dataset["Titles"])
+
+print(f"Total documents: {len(abstracts)}")  # 44,949 abstracts
+```
+
+## The Common Pipeline for Text Clustering
+
+Text clustering typically follows three key steps:
+
+<Steps>
+
+<Step title="1. Embed Documents">
+Convert text to dense vector representations
+</Step>
+
+<Step title="2. Reduce Dimensionality">
+Compress embeddings to lower dimensions while preserving structure
+</Step>
+
+<Step title="3. Cluster Documents">
+Group similar documents using density-based clustering
+</Step>
+
+</Steps>
+
+Let's implement each step in detail.
+
+## Step 1: Embedding Documents
+
+Create semantic embeddings using a sentence transformer:
+
+```python
+from sentence_transformers import SentenceTransformer
+
+# Load a lightweight but powerful embedding model
+embedding_model = SentenceTransformer('thenlper/gte-small')
+
+# Create embeddings for all abstracts
+embeddings = embedding_model.encode(abstracts, show_progress_bar=True)
+
+print(embeddings.shape)  # (44949, 384)
+# 44,949 documents × 384-dimensional embeddings
+```
+
+<Tip>
+**Model Selection**: `thenlper/gte-small` provides a good balance between quality and speed. For better quality, try `sentence-transformers/all-mpnet-base-v2` (768 dims). For production speed, use `sentence-transformers/all-MiniLM-L6-v2` (384 dims).
+</Tip>
+
+## Step 2: Dimensionality Reduction with UMAP
+
+Reduce 384 dimensions to 5 dimensions using UMAP:
+
+```python
+from umap import UMAP
+
+# Configure UMAP for dimensionality reduction
+umap_model = UMAP(
+    n_components=5,        # Reduce to 5 dimensions
+    min_dist=0.0,          # Controls how tightly points cluster
+    metric='cosine',       # Use cosine distance for text
+    random_state=42        # Reproducibility
+)
+
+# Fit and transform embeddings
+reduced_embeddings = umap_model.fit_transform(embeddings)
+
+print(reduced_embeddings.shape)  # (44949, 5)
+```
+
+<Note>
+**Why 5 dimensions?** UMAP to 5D preserves local and global structure while making clustering more effective. For visualization, we'll reduce to 2D separately.
+</Note>
+
+## Step 3: Clustering with HDBSCAN
+
+Cluster the reduced embeddings using HDBSCAN:
+
+```python
+from hdbscan import HDBSCAN
+
+# Configure HDBSCAN for density-based clustering
+hdbscan_model = HDBSCAN(
+    min_cluster_size=50,              # Minimum documents per cluster
+    metric='euclidean',               # Distance metric
+    cluster_selection_method='eom'    # Excess of Mass method
+)
+
+# Fit and extract cluster labels
+hdbscan_model.fit(reduced_embeddings)
+clusters = hdbscan_model.labels_
+
+# Count unique clusters (including -1 for outliers)
+print(f"Number of clusters: {len(set(clusters))}")  # 156 clusters
+print(f"Outliers: {sum(clusters == -1)}")  # Documents not assigned to clusters
+```
+
+<Warning>
+**Outlier Cluster**: HDBSCAN assigns label `-1` to outliers - documents that don't fit well into any cluster. This is a feature, not a bug!
+</Warning>
+
+## Inspecting Clusters
+
+### Manual Inspection
+
+Look at the first three documents in cluster 0:
+
+```python
+import numpy as np
+
+# Print first three documents in cluster 0
+cluster = 0
+for index in np.where(clusters == cluster)[0][:3]:
+    print(abstracts[index][:300] + "...\n")
+```
+
+**Output** (Sign Language cluster):
+```text
+This works aims to design a statistical machine translation from English text
+to American Sign Language (ASL). The system is based on Moses tool with some
+modifications and the results are synthesized through a 3D avatar for
+interpretation...
+
+Researches on signed languages still strongly dissociate linguistic issues
+related on phonological and phonetic aspects, and gesture studies for
+recognition and synthesis purposes...
+
+Modern computational linguistic software cannot produce important aspects of
+sign language translation. Using some researches we deduce that the majority of
+automatic sign language translation systems ignore many aspects...
+```
+
+### Visualizing Clusters
+
+Reduce to 2D for visualization:
+
+```python
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Reduce embeddings to 2D for visualization
+reduced_embeddings_2d = UMAP(
+    n_components=2, 
+    min_dist=0.0, 
+    metric='cosine', 
+    random_state=42
+).fit_transform(embeddings)
+
+# Create dataframe
+df = pd.DataFrame(reduced_embeddings_2d, columns=["x", "y"])
+df["title"] = titles
+df["cluster"] = [str(c) for c in clusters]
+
+# Separate outliers from clusters
+clusters_df = df.loc[df.cluster != "-1", :]
+outliers_df = df.loc[df.cluster == "-1", :]
+
+# Plot
+plt.figure(figsize=(12, 8))
+plt.scatter(outliers_df.x, outliers_df.y, alpha=0.05, s=2, c="grey", label="Outliers")
+plt.scatter(
+    clusters_df.x, 
+    clusters_df.y, 
+    c=clusters_df.cluster.astype(int),
+    alpha=0.6, 
+    s=2, 
+    cmap='tab20b',
+    label="Clusters"
+)
+plt.axis('off')
+plt.title('ArXiv NLP Papers Clustering', fontsize=16)
+plt.show()
+```
+
+## From Clustering to Topic Modeling
+
+Clustering groups documents, but **topic modeling** adds interpretable labels to each cluster using representative keywords.
+
+### BERTopic: Modular Topic Modeling
+
+BERTopic combines all three steps with automatic topic extraction:
+
+```python
+from bertopic import BERTopic
+
+# Create BERTopic model with our pre-configured components
+topic_model = BERTopic(
+    embedding_model=embedding_model,
+    umap_model=umap_model,
+    hdbscan_model=hdbscan_model,
+    verbose=True
+)
+
+# Fit the model
+topics, probs = topic_model.fit_transform(abstracts, embeddings)
+```
+
+**Training Output**:
+```text
+2024-04-24 10:38:31 - BERTopic - Dimensionality - Fitting the dimensionality reduction algorithm
+2024-04-24 10:39:22 - BERTopic - Dimensionality - Completed ✓
+2024-04-24 10:39:22 - BERTopic - Cluster - Start clustering the reduced embeddings
+2024-04-24 10:39:24 - BERTopic - Cluster - Completed ✓
+2024-04-24 10:39:24 - BERTopic - Representation - Extracting topics from clusters
+2024-04-24 10:39:34 - BERTopic - Representation - Completed ✓
+```
+
+### Exploring Topics
+
+View all topics with their top keywords:
+
+```python
+# Get topic information
+topic_info = topic_model.get_topic_info()
+print(topic_info.head(10))
+```
+
+**Output** (sample topics):
+
+| Topic | Count | Name | Representation |
+|-------|-------|------|----------------|
+| -1 | 14520 | -1_the_of_and_to | [the, of, and, to, in, we...] |
+| 0 | 2290 | 0_speech_asr_recognition_end | [speech, asr, recognition, end...] |
+| 1 | 1403 | 1_medical_clinical_biomedical_patient | [medical, clinical, biomedical...] |
+| 2 | 1156 | 2_sentiment_aspect_analysis_reviews | [sentiment, aspect, analysis...] |
+| 3 | 986 | 3_translation_nmt_machine_neural | [translation, nmt, machine...] |
+
+<Tip>
+Topic `-1` represents outliers. The model found **155 distinct topics** from 44,949 abstracts!
+</Tip>
+
+### Examining Individual Topics
+
+Get keywords and weights for a specific topic:
+
+```python
+# Get top 10 keywords for topic 0 (Speech Recognition)
+topic_model.get_topic(0)
+```
+
+**Output**:
+```python
+[
+    ('speech', 0.0282),
+    ('asr', 0.0190),
+    ('recognition', 0.0135),
+    ('end', 0.0098),
+    ('acoustic', 0.0095),
+    ('speaker', 0.0069),
+    ('audio', 0.0068),
+    ('error', 0.0063),
+    ('automatic', 0.0063)
+]
+```
+
+### Searching for Topics
+
+Find topics similar to a search query:
+
+```python
+# Search for topics related to "topic modeling"
+similar_topics, similarity = topic_model.find_topics("topic modeling", top_n=5)
+
+print(f"Most similar topic: {similar_topics[0]} (similarity: {similarity[0]:.3f})")
+# Most similar topic: 22 (similarity: 0.955)
+
+# Examine the topic
+print(topic_model.get_topic(22))
+```
+
+**Output** (Topic 22 - Topic Modeling):
+```python
+[
+    ('topic', 0.0663),
+    ('topics', 0.0353),
+    ('lda', 0.0164),
+    ('latent', 0.0134),
+    ('document', 0.0130),
+    ('documents', 0.0124),
+    ('modeling', 0.0120),
+    ('dirichlet', 0.0101),
+    ('word', 0.0085),
+    ('allocation', 0.0079)
+]
+```
+
+<Note>
+This topic captures traditional LDA-based topic modeling! The model correctly identified papers about topic modeling itself.
+</Note>
+
+## Visualizations
+
+BERTopic provides rich visualizations:
+
+### 1. Document Visualization
+
+Visualize all documents and their topic assignments:
+
+```python
+# Create interactive 2D plot of documents
+fig = topic_model.visualize_documents(
+    titles,
+    reduced_embeddings=reduced_embeddings_2d,
+    width=1200,
+    hide_annotations=True
+)
+
+fig.show()
+```
+
+### 2. Topic Bar Charts
+
+Visualize top keywords per topic:
+
+```python
+# Show top 10 topics with their keywords
+topic_model.visualize_barchart(top_n_topics=10)
+```
+
+### 3. Topic Similarity Heatmap
+
+See which topics are related:
+
+```python
+# Create heatmap of topic similarities
+topic_model.visualize_heatmap(n_clusters=30)
+```
+
+### 4. Hierarchical Topic Structure
+
+Visualize topic hierarchy:
+
+```python
+# Show hierarchical structure of topics
+topic_model.visualize_hierarchy()
+```
+
+## Advanced: Custom Representation Models
+
+BERTopic supports multiple representation models for better topic descriptions:
+
+### KeyBERT-Inspired Representation
+
+Use document embeddings to find the most representative keywords:
+
+```python
+from bertopic.representation import KeyBERTInspired
+
+# Create representation model
+representation_model = KeyBERTInspired()
+
+# Update topic representations
+topic_model.update_topics(
+    abstracts, 
+    representation_model=representation_model
+)
+```
+
+### Using LLMs for Topic Labels
+
+Generate human-readable topic labels with ChatGPT:
+
+```python
+from bertopic.representation import OpenAI
+import openai
+
+# Create OpenAI representation model
+client = openai.OpenAI(api_key="YOUR_KEY_HERE")
+representation_model = OpenAI(
+    client,
+    model="gpt-3.5-turbo",
+    chat=True,
+    nr_docs=5,
+    prompt="I have topic with the following documents: [DOCUMENTS]. Based on the information above, create a short topic label in the following format: 'topic: <topic label>'"
+)
+
+# Update topics with LLM-generated labels
+topic_model.update_topics(
+    abstracts,
+    representation_model=representation_model
+)
+```
+
+## Evaluation Metrics
+
+### Cluster Quality Metrics
+
+```python
+from sklearn.metrics import silhouette_score, calinski_harabasz_score
+
+# Remove outliers for evaluation
+non_outliers = clusters != -1
+
+# Silhouette Score (higher is better, range: -1 to 1)
+silhouette = silhouette_score(
+    reduced_embeddings[non_outliers], 
+    clusters[non_outliers]
+)
+print(f"Silhouette Score: {silhouette:.3f}")
+
+# Calinski-Harabasz Score (higher is better)
+ch_score = calinski_harabasz_score(
+    reduced_embeddings[non_outliers], 
+    clusters[non_outliers]
+)
+print(f"Calinski-Harabasz Score: {ch_score:.2f}")
+```
+
+### Topic Coherence
+
+Measure topic interpretability:
+
+```python
+from gensim.models import CoherenceModel
+from gensim.corpora import Dictionary
+
+# Prepare documents for coherence calculation
+tokenized_docs = [doc.lower().split() for doc in abstracts]
+dictionary = Dictionary(tokenized_docs)
+
+# Get topics as word lists
+topics_words = []
+for topic_id in range(len(set(clusters)) - 1):
+    words = [word for word, _ in topic_model.get_topic(topic_id)]
+    topics_words.append(words)
+
+# Calculate coherence
+coherence_model = CoherenceModel(
+    topics=topics_words,
+    texts=tokenized_docs,
+    dictionary=dictionary,
+    coherence='c_v'
+)
+coherence = coherence_model.get_coherence()
+print(f"Topic Coherence (C_V): {coherence:.3f}")
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+
+<Card title="Embedding Selection" icon="vector-square">
+- Use domain-specific embeddings when available
+- Balance embedding dimension with dataset size
+- Consider multilingual models for non-English text
+- Test multiple embedding models for your use case
+</Card>
+
+<Card title="Hyperparameter Tuning" icon="sliders">
+- `min_cluster_size`: Increase for larger, more general topics
+- `n_components`: 5D works well for most cases
+- `min_dist` (UMAP): 0.0 for tight clusters, 0.1+ for looser
+- `cluster_selection_method`: Try 'eom' and 'leaf'
+</Card>
+
+<Card title="Handling Outliers" icon="filter">
+- Outliers (topic -1) are normal - often 20-30% of documents
+- Reduce `min_cluster_size` to assign more documents
+- Use `reduce_outliers()` method to reassign outliers
+- Consider outliers as "diverse" or "multi-topic" documents
+</Card>
+
+<Card title="Interpretability" icon="eye">
+- Use representation models for better topic descriptions
+- Examine representative documents, not just keywords
+- Create topic labels manually for critical applications
+- Validate topics with domain experts
+</Card>
+
+</CardGroup>
+
+## Real-World Applications
+
+<Tabs>
+  <Tab title="Customer Feedback">
+    - Discover emerging themes in support tickets
+    - Track topic evolution over time
+    - Identify urgent issues automatically
+    - Prioritize product improvements
+  </Tab>
+  
+  <Tab title="Scientific Literature">
+    - Map research landscape in a field
+    - Identify trending research topics
+    - Find related papers across sub-fields
+    - Discover research gaps
+  </Tab>
+  
+  <Tab title="Social Media">
+    - Monitor brand perception themes
+    - Track trending discussions
+    - Identify crisis situations early
+    - Understand audience interests
+  </Tab>
+  
+  <Tab title="Content Organization">
+    - Auto-tag documents for search
+    - Create dynamic content taxonomies
+    - Recommend related content
+    - Organize knowledge bases
+  </Tab>
+</Tabs>
+
+## Performance Tips
+
+<Steps>
+
+<Step title="Pre-compute Embeddings">
+Generate and save embeddings once to speed up experimentation:
+
+```python
+import numpy as np
+
+# Save embeddings
+np.save('embeddings.npy', embeddings)
+
+# Load later
+embeddings = np.load('embeddings.npy')
+```
+</Step>
+
+<Step title="Use GPU Acceleration">
+Speed up embedding generation with GPU:
+
+```python
+model = SentenceTransformer('thenlper/gte-small', device='cuda')
+embeddings = model.encode(texts, show_progress_bar=True, batch_size=32)
+```
+</Step>
+
+<Step title="Batch Processing">
+For very large datasets, process in batches:
+
+```python
+from tqdm import tqdm
+
+batch_size = 1000
+all_embeddings = []
+
+for i in tqdm(range(0, len(abstracts), batch_size)):
+    batch = abstracts[i:i+batch_size]
+    batch_embeddings = model.encode(batch)
+    all_embeddings.append(batch_embeddings)
+
+embeddings = np.vstack(all_embeddings)
+```
+</Step>
+
+</Steps>
+
+## Try It Yourself
+
+<Card title="Open in Google Colab" icon="google" href="https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter05/Chapter%205%20-%20Text%20Clustering%20and%20Topic%20Modeling.ipynb">
+Explore the full notebook with interactive visualizations and 44,949 real ArXiv papers.
+</Card>
+
+## Related Chapters
+
+<CardGroup cols={2}>
+
+<Card title="Text Classification" icon="tag" href="/applications/text-classification">
+Classify documents with labels
+</Card>
+
+<Card title="Embeddings" icon="vector-square" href="/fundamentals/tokens-embeddings">
+Understand how embeddings work
+</Card>
+
+<Card title="Semantic Search" icon="magnifying-glass" href="/advanced/semantic-search-rag">
+Find similar documents efficiently
+</Card>
+
+<Card title="Creating Embeddings" icon="chart-scatter" href="/development/creating-embeddings">
+Train custom embedding models
+</Card>
+
+</CardGroup>

@@ -1,80 +1,190 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get up and running with your first LLM notebook in under 5 minutes
 ---
 
-## Get started in three steps
+# Quickstart Guide
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+Get hands-on with Large Language Models in under 5 minutes! This guide will help you run your first chapter notebook using Google Colab's free GPU.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+No local installation required - everything runs in your browser with Google Colab's free T4 GPU (16GB VRAM).
+</Note>
+
+## Run Your First Notebook
+
+<Steps>
+  <Step title="Open Chapter 1 in Google Colab">
+    Click the badge below to open the first chapter notebook directly in Google Colab:
+
+    [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter01/Chapter%201%20-%20Introduction%20to%20Language%20Models.ipynb)
+
+    This will open the notebook in a new browser tab with all the code ready to run.
+  </Step>
+
+  <Step title="Enable GPU Runtime">
+    In Google Colab, ensure you're using a GPU runtime:
+
+    1. Click **Runtime** in the menu bar
+    2. Select **Change runtime type**
+    3. Choose **T4 GPU** from the Hardware accelerator dropdown
+    4. Click **Save**
+
+    <Tip>
+    The free T4 GPU provides 16GB of VRAM, which is sufficient for all examples in the book.
+    </Tip>
+  </Step>
+
+  <Step title="Install Dependencies">
+    Run the first code cell to install required packages:
+
+    ```python
+    !pip install torch transformers datasets matplotlib
+    ```
+
+    This typically takes 1-2 minutes to complete.
+  </Step>
+
+  <Step title="Run the Examples">
+    Execute the notebook cells sequentially by:
+    - Clicking the play button (▶) next to each cell, or
+    - Pressing `Shift + Enter` to run a cell and move to the next one
+
+    <Warning>
+    Make sure to run cells in order, as later cells often depend on variables or imports from earlier cells.
+    </Warning>
+  </Step>
+</Steps>
+
+## What You'll Learn in Chapter 1
+
+In the first chapter, you'll explore foundational concepts:
+
+<CardGroup cols={2}>
+  <Card title="Language Model Basics" icon="book">
+    Understand what language models are and how they work
+  </Card>
+  <Card title="Word Predictions" icon="brain">
+    See how models predict the next word in a sequence
+  </Card>
+  <Card title="Model Loading" icon="download">
+    Learn to load and use pre-trained models with Transformers
+  </Card>
+  <Card title="First Generations" icon="sparkles">
+    Generate your first text with a language model
+  </Card>
+</CardGroup>
+
+## Example: Your First Text Generation
+
+Here's a taste of what you'll run in Chapter 1 - generating text with a pre-trained model:
+
+```python
+from transformers import pipeline
+
+# Load a text generation pipeline
+generator = pipeline('text-generation', model='gpt2')
+
+# Generate text
+prompt = "Large language models are"
+output = generator(prompt, max_length=50, num_return_sequences=1)
+
+print(output[0]['generated_text'])
+```
+
+<CodeGroup>
+```python Simple Generation
+from transformers import pipeline
+
+# Create a text generation pipeline
+generator = pipeline('text-generation', model='gpt2')
+
+# Generate text from a prompt
+result = generator("The future of AI is", max_length=30)
+print(result[0]['generated_text'])
+```
+
+```python With Parameters
+from transformers import pipeline
+
+# Create pipeline with specific model
+generator = pipeline('text-generation', 
+                    model='gpt2',
+                    device='cuda')  # Use GPU
+
+# Generate with custom parameters
+result = generator(
+    "Large language models are",
+    max_length=50,
+    num_return_sequences=3,
+    temperature=0.7,
+    top_k=50
+)
+
+# Print all generated sequences
+for i, sequence in enumerate(result):
+    print(f"Sequence {i+1}: {sequence['generated_text']}\n")
+```
+</CodeGroup>
+
+## All Chapter Notebooks
+
+Once you're comfortable with Chapter 1, explore the other chapters:
+
+| Chapter | Topic | Colab Link |
+|---------|-------|------------|
+| **1** | Introduction to Language Models | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter01/Chapter%201%20-%20Introduction%20to%20Language%20Models.ipynb) |
+| **2** | Tokens and Embeddings | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter02/Chapter%202%20-%20Tokens%20and%20Token%20Embeddings.ipynb) |
+| **3** | Looking Inside Transformer LLMs | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter03/Chapter%203%20-%20Looking%20Inside%20LLMs.ipynb) |
+| **4** | Text Classification | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter04/Chapter%204%20-%20Text%20Classification.ipynb) |
+| **5** | Text Clustering and Topic Modeling | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter05/Chapter%205%20-%20Text%20Clustering%20and%20Topic%20Modeling.ipynb) |
+| **6** | Prompt Engineering | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter06/Chapter%206%20-%20Prompt%20Engineering.ipynb) |
+| **7** | Advanced Text Generation | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter07/Chapter%207%20-%20Advanced%20Text%20Generation%20Techniques%20and%20Tools.ipynb) |
+| **8** | Semantic Search and RAG | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter08/Chapter%208%20-%20Semantic%20Search.ipynb) |
+| **9** | Multimodal LLMs | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter09/Chapter%209%20-%20Multimodal%20Large%20Language%20Models.ipynb) |
+| **10** | Creating Text Embedding Models | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter10/Chapter%2010%20-%20Creating%20Text%20Embedding%20Models.ipynb) |
+| **11** | Fine-tuning Representation Models | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter11/Chapter%2011%20-%20Fine-Tuning%20BERT.ipynb) |
+| **12** | Fine-tuning Generation Models | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter12/Chapter%2012%20-%20Fine-tuning%20Generation%20Models.ipynb) |
+
+## What You Just Learned
+
+Congratulations! You've just:
+
+✓ Loaded a pre-trained language model
+✓ Generated text using state-of-the-art LLMs
+✓ Used the Hugging Face Transformers library
+✓ Ran everything on a free GPU
+
+<Tip>
+All examples in the book are tested and optimized to run on Google Colab's free T4 GPU, so you can follow along without any local hardware requirements.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Setup Local Environment" icon="laptop" href="/setup">
+    Install dependencies and run notebooks locally
+  </Card>
+  <Card title="Chapter 2: Tokens and Embeddings" icon="cube" href="/fundamentals/tokens-embeddings">
+    Learn how text is converted to numbers
+  </Card>
+  <Card title="Explore All Chapters" icon="book-open" href="/introduction">
+    Browse the complete table of contents
+  </Card>
+  <Card title="Bonus Content" icon="gift" href="/bonus/deeplearningai-course">
+    Check out additional guides and tutorials
+  </Card>
+</CardGroup>
+
+## Need Help?
+
+If you encounter any issues:
+
+1. Check that you're using a GPU runtime in Colab
+2. Ensure you're running cells in order
+3. Try restarting the runtime if you get memory errors
+4. Visit the [GitHub repository](https://github.com/HandsOnLLM/Hands-On-Large-Language-Models) for discussions and issues
+
+<Note>
+Remember to follow the authors on LinkedIn for updates: [Jay Alammar](https://www.linkedin.com/in/jalammar/) and [Maarten Grootendorst](https://www.linkedin.com/in/mgrootendorst/)
 </Note>

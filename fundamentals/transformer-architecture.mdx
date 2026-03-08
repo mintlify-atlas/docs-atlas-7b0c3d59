@@ -1,0 +1,492 @@
+---
+title: 'Looking Inside Transformer LLMs'
+description: 'An extensive exploration of the transformer architecture that powers modern language models'
+icon: 'sitemap'
+---
+
+## Overview
+
+Now that you understand how text becomes tokens and embeddings, it's time to look inside the "black box" of language models. This chapter explores the **transformer architecture**—the neural network design that revolutionized NLP and made modern LLMs possible.
+
+<Note>
+This chapter corresponds to **Chapter 3** of the Hands-On Large Language Models book, providing a visual and practical guide to understanding transformer architectures.
+</Note>
+
+## What You'll Learn
+
+<Steps>
+  <Step title="Transformer Components">
+    Understand the key building blocks: attention, feedforward layers, and normalization
+  </Step>
+  <Step title="Self-Attention Mechanism">
+    Learn how models attend to different parts of the input sequence
+  </Step>
+  <Step title="Model Architecture">
+    Explore the layer-by-layer structure of decoder-only transformers
+  </Step>
+  <Step title="Inference Process">
+    See how models generate text token-by-token
+  </Step>
+  <Step title="KV Caching">
+    Understand the optimization that makes generation 3x faster
+  </Step>
+</Steps>
+
+## Setting Up
+
+```bash
+pip install transformers>=4.41.2 accelerate>=0.31.0
+```
+
+<Note>
+For the best experience, use a GPU with at least 8GB of VRAM. Google Colab offers free T4 GPUs that are perfect for these examples.
+</Note>
+
+## Loading and Inspecting a Model
+
+Let's load Phi-3 and examine its architecture:
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+
+# Load model and tokenizer
+tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+
+model = AutoModelForCausalLM.from_pretrained(
+    "microsoft/Phi-3-mini-4k-instruct",
+    device_map="cuda",
+    torch_dtype="auto",
+    trust_remote_code=False,
+)
+
+# Create a pipeline
+generator = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer,
+    return_full_text=False,
+    max_new_tokens=50,
+    do_sample=False,
+)
+```
+
+### Model Architecture
+
+Let's peek inside the model structure:
+
+```python
+print(model)
+```
+
+**Output:**
+```python
+Phi3ForCausalLM(
+  (model): Phi3Model(
+    (embed_tokens): Embedding(32064, 3072, padding_idx=32000)
+    (embed_dropout): Dropout(p=0.0, inplace=False)
+    (layers): ModuleList(
+      (0-31): 32 x Phi3DecoderLayer(
+        (self_attn): Phi3Attention(
+          (o_proj): Linear(in_features=3072, out_features=3072, bias=False)
+          (qkv_proj): Linear(in_features=3072, out_features=9216, bias=False)
+          (rotary_emb): Phi3RotaryEmbedding()
+        )
+        (mlp): Phi3MLP(
+          (gate_up_proj): Linear(in_features=3072, out_features=16384, bias=False)
+          (down_proj): Linear(in_features=8192, out_features=3072, bias=False)
+          (activation_fn): SiLU()
+        )
+        (input_layernorm): Phi3RMSNorm()
+        (resid_attn_dropout): Dropout(p=0.0, inplace=False)
+        (resid_mlp_dropout): Dropout(p=0.0, inplace=False)
+        (post_attention_layernorm): Phi3RMSNorm()
+      )
+    )
+    (norm): Phi3RMSNorm()
+  )
+  (lm_head): Linear(in_features=3072, out_features=32064, bias=False)
+)
+```
+
+<Tip>
+This architecture shows that Phi-3 has **32 decoder layers**, each with self-attention and feedforward (MLP) components. The model has **3.8 billion parameters**.
+</Tip>
+
+## The Transformer Pipeline
+
+When you generate text, here's what happens inside the model:
+
+<Steps>
+  <Step title="Tokenization">
+    Input text is converted to token IDs: `"The capital of France is"` → `[464, 7483, 310, 3444, 338]`
+  </Step>
+  <Step title="Embedding Lookup">
+    Each token ID becomes a 3,072-dimensional vector via the embedding layer
+  </Step>
+  <Step title="Positional Encoding">
+    Position information is added (Phi-3 uses Rotary Position Embeddings)
+  </Step>
+  <Step title="Transformer Layers">
+    The embeddings pass through 32 decoder layers, each applying:
+    - Layer normalization
+    - Self-attention mechanism
+    - Feedforward neural network (MLP)
+    - Residual connections
+  </Step>
+  <Step title="Output Projection">
+    The final layer output is projected to vocabulary size (32,064 dimensions)
+  </Step>
+  <Step title="Token Selection">
+    The model picks the next token from the probability distribution
+  </Step>
+</Steps>
+
+## Understanding Model Input and Output
+
+Let's trace a forward pass through the model:
+
+```python
+prompt = "The capital of France is"
+
+# Tokenize the input prompt
+input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+input_ids = input_ids.to("cuda")
+
+# Get the output of the model before the lm_head
+model_output = model.model(input_ids)
+
+# Get the output of the lm_head
+lm_head_output = model.lm_head(model_output[0])
+```
+
+### Examining Tensor Shapes
+
+```python
+print(f"Model output shape: {model_output[0].shape}")  
+print(f"LM head output shape: {lm_head_output.shape}")
+```
+
+**Output:**
+```
+Model output shape: torch.Size([1, 6, 3072])
+LM head output shape: torch.Size([1, 6, 32064])
+```
+
+<AccordionGroup>
+  <Accordion title="Understanding the Dimensions">
+    - **First dimension (1):** Batch size (processing 1 sequence)
+    - **Second dimension (6):** Sequence length (6 tokens in the input)
+    - **Third dimension (3072 → 32064):** Hidden size → Vocabulary size
+    
+    The model output has a 3,072-dimensional vector for each token position. The `lm_head` projects this to 32,064 dimensions—one score for each token in the vocabulary.
+  </Accordion>
+</AccordionGroup>
+
+### Predicting the Next Token
+
+```python
+# Get the highest-probability token at the last position
+token_id = lm_head_output[0, -1].argmax(-1)
+print(tokenizer.decode(token_id))
+```
+
+**Output:**
+```
+Paris
+```
+
+<Tip>
+The model correctly predicts "Paris" as the capital of France! The `argmax` operation selects the token with the highest score from the 32,064 possibilities.
+</Tip>
+
+## Key Transformer Components
+
+<CardGroup cols={2}>
+  <Card title="Self-Attention" icon="eye">
+    Allows each token to attend to all previous tokens, capturing context and relationships across the sequence.
+  </Card>
+  <Card title="Feedforward Network" icon="brain">
+    Two-layer MLP that processes each token independently, adding non-linear transformations.
+  </Card>
+  <Card title="Layer Normalization" icon="equals">
+    Normalizes activations to stabilize training and improve convergence (Phi-3 uses RMSNorm).
+  </Card>
+  <Card title="Residual Connections" icon="arrows-turn-right">
+    Skip connections that help gradients flow during training and prevent degradation.
+  </Card>
+</CardGroup>
+
+## The Self-Attention Mechanism
+
+Self-attention is the heart of the transformer. For each token, it:
+
+1. **Creates Query, Key, Value vectors** from the input embedding
+2. **Computes attention scores** by comparing the query with all keys
+3. **Applies softmax** to get attention weights (what to focus on)
+4. **Combines values** weighted by attention scores
+
+```python
+# Inside Phi3Attention
+class Phi3Attention:
+    def __init__(self):
+        self.qkv_proj = Linear(3072, 9216)  # Projects to Q, K, V
+        self.o_proj = Linear(3072, 3072)    # Output projection
+        self.rotary_emb = Phi3RotaryEmbedding()  # Position encoding
+```
+
+<Warning>
+In causal (autoregressive) language models, attention is **masked** so each token can only attend to previous tokens, not future ones. This maintains the left-to-right generation property.
+</Warning>
+
+## Multi-Head Attention
+
+Phi-3 uses **32 attention heads**, each learning different relationships:
+
+- Some heads focus on syntax (subject-verb agreement)
+- Others capture semantics (word meanings)
+- Some learn long-range dependencies
+- Others handle local context
+
+This parallel processing allows the model to capture multiple types of relationships simultaneously.
+
+## Feedforward Networks (MLP)
+
+After attention, each token passes through a feedforward network:
+
+```python
+Phi3MLP(
+  (gate_up_proj): Linear(3072, 16384)  # Expand dimensions
+  (down_proj): Linear(8192, 3072)       # Project back down
+  (activation_fn): SiLU()               # Non-linear activation
+)
+```
+
+The MLP:
+1. **Expands** the representation to 16,384 dimensions
+2. **Applies non-linear activation** (SiLU)
+3. **Projects back** to 3,072 dimensions
+
+This expansion and contraction allows the model to learn complex, non-linear transformations.
+
+## KV Caching: Speeding Up Generation
+
+One of the most important optimizations in transformer inference is **KV caching**.
+
+### The Problem
+
+Without caching, generating each new token requires:
+- Recomputing attention for ALL previous tokens
+- Redundant computation that grows quadratically with sequence length
+
+### The Solution
+
+**KV caching** stores the Key and Value vectors from previous tokens, so they don't need to be recomputed.
+
+<CodeGroup>
+```python Without KV Cache
+prompt = "Write a very long email apologizing to Sarah for the tragic gardening mishap. Explain how it happened."
+input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to("cuda")
+
+# Generate without caching
+generation_output = model.generate(
+    input_ids=input_ids,
+    max_new_tokens=100,
+    use_cache=False  # No caching
+)
+```
+
+```python With KV Cache
+prompt = "Write a very long email apologizing to Sarah for the tragic gardening mishap. Explain how it happened."
+input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to("cuda")
+
+# Generate with caching
+generation_output = model.generate(
+    input_ids=input_ids,
+    max_new_tokens=100,
+    use_cache=True  # Enable caching
+)
+```
+</CodeGroup>
+
+### Performance Comparison
+
+Benchmarking the same generation task:
+
+```python
+%%timeit -n 1
+generation_output = model.generate(
+    input_ids=input_ids,
+    max_new_tokens=100,
+    use_cache=True
+)
+# Result: 6.66 s ± 2.22 s per loop
+
+%%timeit -n 1
+generation_output = model.generate(
+    input_ids=input_ids,
+    max_new_tokens=100,
+    use_cache=False
+)
+# Result: 21.9 s ± 94.6 ms per loop
+```
+
+<Tip>
+**3.3x speedup!** KV caching reduces generation time from ~22 seconds to ~7 seconds for 100 tokens. This speedup increases with longer sequences.
+</Tip>
+
+### How It Works
+
+With KV caching:
+1. **First token:** Compute K, V for all input tokens, cache them
+2. **Subsequent tokens:** 
+   - Only compute K, V for the new token
+   - Retrieve cached K, V for previous tokens
+   - Concatenate and compute attention
+
+This changes the computational complexity from O(n²) to O(n) for generation.
+
+## Model Architecture Patterns
+
+Modern transformer LLMs follow several architectural patterns:
+
+<Tabs>
+  <Tab title="Decoder-Only (GPT-style)">
+    **Architecture:** Stack of decoder layers with causal attention
+    
+    **Models:** GPT-2/3/4, Phi-3, LLaMA, Mistral
+    
+    **Best for:** Text generation, chat, code completion
+    
+    **Key feature:** Autoregressive generation, one token at a time
+  </Tab>
+  
+  <Tab title="Encoder-Only (BERT-style)">
+    **Architecture:** Stack of encoder layers with bidirectional attention
+    
+    **Models:** BERT, RoBERTa, ALBERT
+    
+    **Best for:** Classification, embeddings, understanding tasks
+    
+    **Key feature:** Can see full context (past and future)
+  </Tab>
+  
+  <Tab title="Encoder-Decoder (T5-style)">
+    **Architecture:** Separate encoder and decoder stacks
+    
+    **Models:** T5, BART, mT5
+    
+    **Best for:** Translation, summarization, seq2seq tasks
+    
+    **Key feature:** Separate context encoding and generation
+  </Tab>
+</Tabs>
+
+<Note>
+This guide focuses on **decoder-only** architectures, which are used by most modern generative language models.
+</Note>
+
+## Practical Considerations
+
+### Model Size and Memory
+
+For Phi-3 (3.8B parameters):
+- **Float32:** ~15 GB (4 bytes per parameter)
+- **Float16:** ~7.6 GB (2 bytes per parameter)
+- **Int8:** ~3.8 GB (1 byte per parameter)
+
+Plus additional memory for:
+- Activations during forward pass
+- KV cache (grows with sequence length)
+- Gradients (if training)
+
+### Inference Optimization Techniques
+
+<CardGroup cols={2}>
+  <Card title="KV Caching" icon="memory">
+    Cache key-value pairs to avoid recomputation (3-4x speedup)
+  </Card>
+  <Card title="Quantization" icon="compress">
+    Reduce precision (INT8, INT4) to save memory and speed up inference
+  </Card>
+  <Card title="Flash Attention" icon="bolt">
+    Optimized attention implementation that reduces memory usage
+  </Card>
+  <Card title="Batching" icon="layer-group">
+    Process multiple sequences in parallel for better GPU utilization
+  </Card>
+</CardGroup>
+
+## Visualizing the Architecture
+
+The transformer processes information through a vertical stack:
+
+```
+Input Text
+    ↓
+[Tokenization]
+    ↓
+Token IDs: [464, 7483, 310, 3444, 338]
+    ↓
+[Embedding Layer]
+    ↓
+Embeddings: [3072-dim vectors]
+    ↓
+[Layer 1: Attention + FFN]
+    ↓
+[Layer 2: Attention + FFN]
+    ↓
+      ...
+    ↓
+[Layer 32: Attention + FFN]
+    ↓
+[Final Layer Norm]
+    ↓
+[LM Head Projection]
+    ↓
+Logits: [32064-dim vector]
+    ↓
+[Argmax or Sampling]
+    ↓
+Next Token: "Paris"
+```
+
+Each layer refines the representation, adding more context and semantic understanding.
+
+## Run the Full Notebook
+
+<Card title="Chapter 3 Notebook" icon="rocket" href="https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter03/Chapter%203%20-%20Looking%20Inside%20LLMs.ipynb">
+  Explore the transformer architecture with interactive visualizations in Google Colab
+</Card>
+
+## Key Takeaways
+
+<Check>Transformers use stacked layers of attention and feedforward networks</Check>
+<Check>Self-attention allows tokens to attend to context and learn relationships</Check>
+<Check>KV caching dramatically speeds up autoregressive generation</Check>
+<Check>The lm_head projects hidden states to vocabulary-sized logits</Check>
+<Check>Model architecture choices impact performance, memory, and capabilities</Check>
+
+## Next Steps
+
+Now that you understand the transformer architecture, you're ready to apply LLMs to real-world tasks:
+
+<CardGroup cols={2}>
+  <Card title="Text Classification" icon="tags" href="/applications/text-classification">
+    Use transformers for sentiment analysis and classification tasks
+  </Card>
+  <Card title="Prompt Engineering" icon="wand-magic-sparkles" href="/advanced/prompt-engineering">
+    Learn techniques to get better results from language models
+  </Card>
+  <Card title="Fine-tuning Models" icon="screwdriver-wrench" href="/development/fine-tuning-generation">
+    Adapt pre-trained models to your specific use case
+  </Card>
+  <Card title="Semantic Search" icon="magnifying-glass" href="/advanced/semantic-search-rag">
+    Build search systems using transformer embeddings
+  </Card>
+</CardGroup>
+
+---
+
+<Tip>
+**The Big Picture:** The transformer architecture's key innovation is the attention mechanism, which allows models to learn relationships between any two positions in the sequence. Combined with massive scale (billions of parameters) and training data (trillions of tokens), this architecture has enabled the capabilities we see in modern LLMs.
+</Tip>

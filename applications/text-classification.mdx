@@ -1,0 +1,382 @@
+---
+title: "Text Classification"
+description: "Learn to classify text using representation and generative models including BERT, SetFit, and GPT"
+icon: "tag"
+---
+
+# Text Classification
+
+Text classification is one of the most fundamental and widely-used NLP tasks, involving the assignment of predefined labels to text documents. This chapter explores multiple approaches to text classification, from task-specific models to zero-shot methods and generative models.
+
+<Note>
+This chapter uses the **Rotten Tomatoes** movie review dataset with 8,530 training examples for sentiment classification (positive/negative reviews).
+</Note>
+
+## Overview
+
+Text classification has evolved significantly with the advent of large language models. You can now choose from several approaches:
+
+- **Task-specific models**: Fine-tuned models like RoBERTa for specific classification tasks
+- **Embedding-based classification**: Using sentence embeddings with traditional ML classifiers
+- **Zero-shot classification**: Classifying without training data using semantic similarity
+- **Generative models**: Using encoder-decoder models (T5) or LLMs (ChatGPT) for classification
+
+## Dataset Setup
+
+The examples use the Rotten Tomatoes dataset from Hugging Face:
+
+```python
+from datasets import load_dataset
+
+# Load the data
+data = load_dataset("rotten_tomatoes")
+# DatasetDict with train (8,530), validation (1,066), and test (1,066) splits
+
+# Example review
+print(data["train"][0])
+# {'text': 'the rock is destined to be the 21st century\'s new "conan"...', 
+#  'label': 1}  # 1 = positive, 0 = negative
+```
+
+## Approach 1: Task-Specific Models
+
+### Using Pre-trained Sentiment Models
+
+The most straightforward approach is using a model already fine-tuned for sentiment analysis:
+
+```python
+from transformers import pipeline
+
+# Load a sentiment-specific RoBERTa model
+model_path = "cardiffnlp/twitter-roberta-base-sentiment-latest"
+
+pipe = pipeline(
+    model=model_path,
+    tokenizer=model_path,
+    return_all_scores=True,
+    device="cuda:0"  # Use GPU for faster inference
+)
+
+# Run inference on test set
+import numpy as np
+from tqdm import tqdm
+from transformers.pipelines.pt_utils import KeyDataset
+
+y_pred = []
+for output in tqdm(pipe(KeyDataset(data["test"], "text")), total=len(data["test"])):
+    negative_score = output[0]["score"]
+    positive_score = output[2]["score"]
+    assignment = np.argmax([negative_score, positive_score])
+    y_pred.append(assignment)
+```
+
+### Performance: Task-Specific Model
+
+<CodeGroup>
+```python Evaluation Metrics
+from sklearn.metrics import classification_report
+
+print(classification_report(
+    data["test"]["label"], 
+    y_pred,
+    target_names=["Negative Review", "Positive Review"]
+))
+```
+
+```text Results
+                 precision    recall  f1-score   support
+
+Negative Review       0.76      0.88      0.81       533
+Positive Review       0.86      0.72      0.78       533
+
+       accuracy                           0.80      1066
+```
+</CodeGroup>
+
+**Result**: 80% accuracy with a pre-trained model (no additional training required)
+
+## Approach 2: Embedding-Based Classification
+
+### Supervised Classification with Embeddings
+
+This approach combines neural embeddings with classical machine learning:
+
+<Steps>
+
+<Step title="Generate Embeddings">
+Use a sentence transformer model to create embeddings for all documents:
+
+```python
+from sentence_transformers import SentenceTransformer
+
+# Load embedding model
+model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+
+# Convert text to embeddings (768 dimensions)
+train_embeddings = model.encode(data["train"]["text"], show_progress_bar=True)
+test_embeddings = model.encode(data["test"]["text"], show_progress_bar=True)
+
+print(train_embeddings.shape)  # (8530, 768)
+```
+</Step>
+
+<Step title="Train Classifier">
+Train a simple logistic regression on the embeddings:
+
+```python
+from sklearn.linear_model import LogisticRegression
+
+# Train on embeddings
+clf = LogisticRegression(random_state=42)
+clf.fit(train_embeddings, data["train"]["label"])
+
+# Predict on test set
+y_pred = clf.predict(test_embeddings)
+```
+</Step>
+
+<Step title="Evaluate Performance">
+```python
+from sklearn.metrics import classification_report
+
+print(classification_report(
+    data["test"]["label"], 
+    y_pred,
+    target_names=["Negative Review", "Positive Review"]
+))
+```
+</Step>
+
+</Steps>
+
+### Performance: Supervised Embeddings + Logistic Regression
+
+```text Results
+                 precision    recall  f1-score   support
+
+Negative Review       0.85      0.86      0.85       533
+Positive Review       0.86      0.85      0.85       533
+
+       accuracy                           0.85      1066
+```
+
+**Result**: 85% accuracy - better than the task-specific model!
+
+<Tip>
+**Alternative Approach**: You can achieve similar results (84% accuracy) without any classifier by simply averaging embeddings per class and using cosine similarity for classification.
+</Tip>
+
+### Zero-Shot Classification
+
+Classify documents without any training data by comparing document embeddings to label embeddings:
+
+```python
+# Create embeddings for label descriptions
+label_embeddings = model.encode([
+    "A negative review",
+    "A positive review"
+])
+
+# Find best matching label for each document
+from sklearn.metrics.pairwise import cosine_similarity
+
+sim_matrix = cosine_similarity(test_embeddings, label_embeddings)
+y_pred = np.argmax(sim_matrix, axis=1)  # Choose highest similarity
+```
+
+### Performance: Zero-Shot Classification
+
+```text Results
+                 precision    recall  f1-score   support
+
+Negative Review       0.78      0.77      0.78       533
+Positive Review       0.77      0.79      0.78       533
+
+       accuracy                           0.78      1066
+```
+
+**Result**: 78% accuracy without any training data!
+
+<Warning>
+The quality of zero-shot classification heavily depends on your label descriptions. Try variations like "A very negative movie review" vs "A negative review" to optimize results.
+</Warning>
+
+## Approach 3: Generative Models
+
+### Using Encoder-Decoder Models (T5)
+
+Generate classification labels as text using FLAN-T5:
+
+```python
+from transformers import pipeline
+
+# Load T5 model for text generation
+pipe = pipeline(
+    "text2text-generation",
+    model="google/flan-t5-small",
+    device="cuda:0"
+)
+
+# Prepare data with prompt
+prompt = "Is the following sentence positive or negative? "
+data = data.map(lambda example: {"t5": prompt + example['text']})
+
+# Run inference
+y_pred = []
+for output in tqdm(pipe(KeyDataset(data["test"], "t5")), total=len(data["test"])):
+    text = output[0]["generated_text"]
+    y_pred.append(0 if text == "negative" else 1)
+```
+
+### Performance: FLAN-T5-Small
+
+```text Results
+                 precision    recall  f1-score   support
+
+Negative Review       0.83      0.85      0.84       533
+Positive Review       0.85      0.83      0.84       533
+
+       accuracy                           0.84      1066
+```
+
+**Result**: 84% accuracy with a small generative model
+
+### Using ChatGPT for Classification
+
+Leverage GPT-3.5-turbo for high-quality classification:
+
+```python
+import openai
+
+# Create OpenAI client
+client = openai.OpenAI(api_key="YOUR_KEY_HERE")
+
+def chatgpt_generation(prompt, document, model="gpt-3.5-turbo-0125"):
+    """Generate classification using ChatGPT"""
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a helpful assistant."
+        },
+        {
+            "role": "user",
+            "content": prompt.replace("[DOCUMENT]", document)
+        }
+    ]
+    chat_completion = client.chat.completions.create(
+        messages=messages,
+        model=model,
+        temperature=0
+    )
+    return chat_completion.choices[0].message.content
+
+# Define prompt template
+prompt = """Predict whether the following document is a positive or negative movie review:
+
+[DOCUMENT]
+
+If it is positive return 1 and if it is negative return 0. Do not give any other answers.
+"""
+
+# Test single example
+document = "unpretentious, charming, quirky, original"
+result = chatgpt_generation(prompt, document)
+print(result)  # Output: "1"
+
+# Run on full test set (requires API credits)
+predictions = [chatgpt_generation(prompt, doc) for doc in tqdm(data["test"]["text"])]
+y_pred = [int(pred) for pred in predictions]
+```
+
+### Performance: GPT-3.5-Turbo
+
+```text Results
+                 precision    recall  f1-score   support
+
+Negative Review       0.87      0.97      0.92       533
+Positive Review       0.96      0.86      0.91       533
+
+       accuracy                           0.91      1066
+```
+
+**Result**: 91% accuracy - best performance, but requires API costs
+
+## Model Comparison
+
+| Approach | Model | Accuracy | Training Required | Cost |
+|----------|-------|----------|-------------------|------|
+| Task-Specific | RoBERTa-Sentiment | 80% | No | Free |
+| Embeddings + ML | MPNet + LogReg | 85% | Yes (fast) | Free |
+| Zero-Shot | MPNet + Similarity | 78% | No | Free |
+| Generative | FLAN-T5-Small | 84% | No | Free |
+| LLM | GPT-3.5-Turbo | 91% | No | API costs |
+
+## Best Practices
+
+<CardGroup cols={2}>
+
+<Card title="Model Selection" icon="wand-magic-sparkles">
+- Use **task-specific models** for quick baseline results
+- Use **embeddings + ML** when you have labeled data and want high accuracy
+- Use **zero-shot** when you have no labeled data
+- Use **LLMs** when you need the highest quality and have API budget
+</Card>
+
+<Card title="Performance Tips" icon="rocket">
+- Always use GPU (`device="cuda:0"`) for faster inference
+- Batch predictions when possible using `KeyDataset`
+- Experiment with different label descriptions for zero-shot
+- Use temperature=0 with LLMs for consistent classification
+</Card>
+
+<Card title="Evaluation" icon="chart-line">
+- Use precision, recall, and F1-score (not just accuracy)
+- Create a confusion matrix to understand errors
+- Test on held-out data to avoid overfitting
+- Compare multiple approaches on your specific domain
+</Card>
+
+<Card title="Cost Optimization" icon="dollar-sign">
+- Start with free approaches (task-specific, embeddings)
+- Use smaller models (FLAN-T5-small) before large LLMs
+- Cache LLM predictions to avoid repeated API calls
+- Consider fine-tuning smaller models for production
+</Card>
+
+</CardGroup>
+
+## Real-World Applications
+
+- **Content Moderation**: Classify comments as toxic, spam, or appropriate
+- **Customer Support**: Route tickets to correct departments
+- **Social Media**: Analyze sentiment of brand mentions
+- **Document Organization**: Auto-tag documents for knowledge management
+- **Email Filtering**: Classify emails as urgent, promotional, or personal
+
+## Try It Yourself
+
+<Card title="Open in Google Colab" icon="google" href="https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter04/Chapter%204%20-%20Text%20Classification.ipynb">
+Run all the examples in this chapter interactively with free GPU resources.
+</Card>
+
+## Related Chapters
+
+<CardGroup cols={2}>
+
+<Card title="Embeddings" icon="vector-square" href="/fundamentals/tokens-embeddings">
+Learn how sentence embeddings work
+</Card>
+
+<Card title="Text Clustering" icon="object-group" href="/applications/text-clustering">
+Group similar documents automatically
+</Card>
+
+<Card title="Prompt Engineering" icon="terminal" href="/advanced/prompt-engineering">
+Optimize prompts for LLM classification
+</Card>
+
+<Card title="Model Fine-Tuning" icon="gear" href="/development/fine-tuning-classification">
+Fine-tune models for your domain
+</Card>
+
+</CardGroup>

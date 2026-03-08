@@ -1,0 +1,716 @@
+---
+title: Fine-Tuning Generation Models
+description: Master QLoRA and supervised fine-tuning for large language models with practical examples
+icon: wand-magic-sparkles
+---
+
+## Overview
+
+Fine-tuning generative language models involves adapting pre-trained models like LLaMA, Mistral, or GPT to follow instructions, match specific writing styles, or specialize in domain tasks. This chapter covers Supervised Fine-Tuning (SFT) and Direct Preference Optimization (DPO) using parameter-efficient methods.
+
+<Note>
+Modern fine-tuning uses QLoRA (Quantized Low-Rank Adaptation) to train 7B+ parameter models on consumer GPUs with minimal performance degradation.
+</Note>
+
+## When to Use This Technique
+
+Fine-tune generation models when you need:
+
+- **Instruction Following**: Adapt base models to follow specific instruction formats
+- **Domain Specialization**: Train models on domain-specific knowledge (medical, legal, technical)
+- **Style Matching**: Match specific writing styles, tones, or formats
+- **Improved Quality**: Enhance output quality beyond what prompting can achieve
+- **Cost Reduction**: Replace expensive API calls with self-hosted models
+- **Data Privacy**: Keep sensitive data on-premises
+
+## GPU Requirements
+
+<Warning>
+**Minimum Requirements**: T4 GPU with 16GB VRAM (with QLoRA)
+
+- Without quantization: A100 80GB required for 7B models
+- With QLoRA: T4 16GB sufficient for 7B models
+- Training time: 10-15 minutes per epoch (3K samples, batch size 2)
+- Memory savings: 4x reduction with 4-bit quantization
+</Warning>
+
+## Dataset Preparation
+
+Instruction tuning requires conversational data in a specific format:
+
+### Data Format
+
+```python
+from transformers import AutoTokenizer
+from datasets import load_dataset
+
+# Load tokenizer for chat template
+template_tokenizer = AutoTokenizer.from_pretrained(
+    "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+)
+
+def format_prompt(example):
+    """Format using model's chat template"""
+    chat = example["messages"]
+    prompt = template_tokenizer.apply_chat_template(chat, tokenize=False)
+    return {"text": prompt}
+
+# Load and format instruction dataset
+dataset = (
+    load_dataset("HuggingFaceH4/ultrachat_200k", split="test_sft")
+    .shuffle(seed=42)
+    .select(range(3_000))
+)
+dataset = dataset.map(format_prompt)
+```
+
+### Example Formatted Prompt
+
+```text
+<|user|>
+Given the text: Knock, knock. Who's there? Hike.
+Can you continue the joke based on this text?</s>
+<|assistant|>
+Sure! Knock, knock. Who's there? Hike. Hike who? 
+Hike up your pants, it's cold outside!</s>
+<|user|>
+Can you tell me another knock-knock joke?</s>
+<|assistant|>
+Of course! Knock, knock. Who's there? Hike. Hike who? 
+Hike your way over here and let's go for a walk!</s>
+```
+
+### Dataset Requirements
+
+| Training Type | Minimum Samples | Recommended | Quality Priority |
+|--------------|----------------|-------------|------------------|
+| SFT | 1,000 | 10,000+ | Instruction diversity |
+| DPO | 500 pairs | 5,000+ pairs | Preference quality |
+
+<Tip>
+Quality matters more than quantity. 1,000 high-quality instruction-response pairs outperform 10,000 low-quality examples.
+</Tip>
+
+## Supervised Fine-Tuning (SFT)
+
+<Steps>
+
+<Step title="Load Model with Quantization">
+
+QLoRA uses 4-bit quantization to reduce memory:
+
+```python
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+model_name = "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T"
+
+# 4-bit quantization configuration
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,  # 4-bit precision
+    bnb_4bit_quant_type="nf4",  # NormalFloat4 quantization
+    bnb_4bit_compute_dtype="float16",  # Compute in FP16
+    bnb_4bit_use_double_quant=True,  # Nested quantization
+)
+
+# Load quantized model
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    device_map="auto",
+    quantization_config=bnb_config,  # Apply quantization
+)
+model.config.use_cache = False
+model.config.pretraining_tp = 1
+
+# Load tokenizer
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+tokenizer.pad_token = "<PAD>"
+tokenizer.padding_side = "left"  # Left padding for generation
+```
+
+**Memory Usage**:
+- Full precision (FP32): ~28GB VRAM for 7B model
+- Half precision (FP16): ~14GB VRAM
+- 4-bit quantization: ~7GB VRAM
+- With QLoRA: Fits on 16GB GPU
+
+</Step>
+
+<Step title="Configure LoRA">
+
+LoRA adds trainable low-rank adapters:
+
+```python
+from peft import LoraConfig, prepare_model_for_kbit_training, get_peft_model
+
+# LoRA configuration
+peft_config = LoraConfig(
+    lora_alpha=32,  # Scaling factor
+    lora_dropout=0.1,  # Dropout probability
+    r=64,  # Rank (higher = more capacity)
+    bias="none",
+    task_type="CAUSAL_LM",
+    target_modules=[  # Layers to add adapters
+        'q_proj', 'k_proj', 'v_proj', 'o_proj',
+        'gate_proj', 'up_proj', 'down_proj'
+    ]
+)
+
+# Prepare model for k-bit training
+model = prepare_model_for_kbit_training(model)
+model = get_peft_model(model, peft_config)
+
+# Check trainable parameters
+model.print_trainable_parameters()
+# Output: trainable params: 4,194,304 || all params: 1,104,400,384 || trainable%: 0.38%
+```
+
+**LoRA Hyperparameters**:
+
+| Parameter | Value | Effect |
+|-----------|-------|--------|
+| `r` (rank) | 64 | Higher = more capacity, slower training |
+| `lora_alpha` | 32 | Scaling factor, typically r/2 |
+| `lora_dropout` | 0.1 | Regularization, 0.05-0.1 recommended |
+| `target_modules` | All attention + FFN | More modules = better but slower |
+
+</Step>
+
+<Step title="Configure Training">
+
+```python
+from transformers import TrainingArguments
+
+output_dir = "./results"
+
+training_arguments = TrainingArguments(
+    output_dir=output_dir,
+    per_device_train_batch_size=2,
+    gradient_accumulation_steps=4,  # Effective batch size = 8
+    optim="paged_adamw_32bit",  # Memory-efficient optimizer
+    learning_rate=2e-4,
+    lr_scheduler_type="cosine",
+    num_train_epochs=1,
+    logging_steps=10,
+    fp16=True,  # Mixed precision training
+    gradient_checkpointing=True,  # Trade compute for memory
+)
+```
+
+**Key Hyperparameters**:
+
+| Parameter | Recommended | Notes |
+|-----------|------------|-------|
+| `learning_rate` | 1e-4 to 3e-4 | Higher than full fine-tuning |
+| `batch_size` | 2-4 | Adjust based on VRAM |
+| `gradient_accumulation_steps` | 4-8 | Effective batch size matters |
+| `num_train_epochs` | 1-3 | More epochs risk overfitting |
+| `lr_scheduler_type` | cosine | Smooth learning rate decay |
+
+</Step>
+
+<Step title="Train with SFTTrainer">
+
+```python
+from trl import SFTTrainer
+
+# Initialize trainer
+trainer = SFTTrainer(
+    model=model,
+    train_dataset=dataset,
+    dataset_text_field="text",
+    tokenizer=tokenizer,
+    args=training_arguments,
+    max_seq_length=512,
+    peft_config=peft_config,  # LoRA configuration
+)
+
+# Train model
+trainer.train()
+
+# Expected output:
+# [375/375 12:45, Epoch 1/1]
+# Step | Training Loss
+#   10 | 1.671
+#   50 | 1.478
+#  100 | 1.404
+#  200 | 1.475
+#  375 | 1.452
+
+# Save LoRA adapters
+trainer.model.save_pretrained("TinyLlama-1.1B-qlora")
+```
+
+**Training Progress**:
+- **Initial Loss**: ~1.67 (model learning instruction format)
+- **Mid Training**: ~1.40 (model improving)
+- **Final Loss**: ~1.40 (well-trained on 3K samples)
+- **Time**: ~12 minutes for 3K samples on T4
+
+</Step>
+
+<Step title="Merge Adapters">
+
+Combine LoRA weights with base model:
+
+```python
+from peft import AutoPeftModelForCausalLM
+
+# Load model with adapters
+model = AutoPeftModelForCausalLM.from_pretrained(
+    "TinyLlama-1.1B-qlora",
+    low_cpu_mem_usage=True,
+    device_map="auto",
+)
+
+# Merge LoRA weights into base model
+merged_model = model.merge_and_unload()
+
+# Save merged model
+merged_model.save_pretrained("TinyLlama-1.1B-instruct-merged")
+tokenizer.save_pretrained("TinyLlama-1.1B-instruct-merged")
+```
+
+<Note>
+Merged models have the same inference speed as base models. Keep adapters separate if you need multiple task-specific versions.
+</Note>
+
+</Step>
+
+</Steps>
+
+## Inference with Fine-Tuned Model
+
+```python
+from transformers import pipeline
+
+# Load fine-tuned model
+pipe = pipeline(
+    task="text-generation",
+    model=merged_model,
+    tokenizer=tokenizer,
+    max_new_tokens=200,
+    temperature=0.7,
+)
+
+# Use model's chat template
+prompt = """<|user|>
+Tell me something about Large Language Models.</s>
+<|assistant|>
+"""
+
+output = pipe(prompt)[0]["generated_text"]
+print(output)
+```
+
+**Sample Output**:
+```text
+<|user|>
+Tell me something about Large Language Models.</s>
+<|assistant|>
+Large Language Models (LLMs) are a type of artificial intelligence 
+that can generate human-like language. They are trained on large 
+amounts of data and are capable of generating complex and nuanced 
+language.
+
+LLMs are used in natural language processing (NLP), machine 
+translation, and chatbots. They can generate text, speech, or 
+images, and can be trained to understand different languages and 
+dialects.
+
+One significant application is in natural language generation (NLG). 
+LLMs can generate text in various languages and can also be used 
+to generate speech in chatbots or voice assistants.
+```
+
+## Preference Tuning (DPO)
+
+Direct Preference Optimization aligns models with human preferences:
+
+### Data Format for DPO
+
+```python
+from datasets import load_dataset
+
+# Load preference dataset
+dataset = load_dataset("Intel/orca_dpo_pairs", split="train")
+
+# Filter for English and map fields
+dataset = (
+    dataset.filter(lambda x: x["language"] == "English")
+    .select(range(10_000))
+    .map(lambda x: {
+        "prompt": x["question"],
+        "chosen": x["chosen"],
+        "rejected": x["rejected"]
+    })
+)
+
+# Example:
+# {
+#   'prompt': 'How do I learn Python?',
+#   'chosen': 'Start with official Python tutorial...',
+#   'rejected': 'Just Google it and copy code...'
+# }
+```
+
+### Training with DPO
+
+```python
+from trl import DPOTrainer
+
+# Load reference model (original SFT model)
+ref_model = AutoPeftModelForCausalLM.from_pretrained(
+    "TinyLlama-1.1B-qlora",
+    device_map="auto",
+)
+
+# DPO trainer
+dpo_trainer = DPOTrainer(
+    model=model,
+    ref_model=ref_model,
+    train_dataset=dataset,
+    tokenizer=tokenizer,
+    args=training_arguments,
+    beta=0.1,  # KL divergence penalty
+    max_prompt_length=512,
+    max_length=1024,
+)
+
+# Train
+dpo_trainer.train()
+```
+
+**DPO Hyperparameters**:
+
+| Parameter | Value | Purpose |
+|-----------|-------|----------|
+| `beta` | 0.1 | Controls deviation from reference model |
+| `max_prompt_length` | 512 | Truncate long prompts |
+| `max_length` | 1024 | Max total sequence length |
+| `learning_rate` | 5e-5 | Lower than SFT |
+
+## Evaluation Metrics
+
+### Perplexity
+
+```python
+import torch
+from torch.nn import CrossEntropyLoss
+
+def calculate_perplexity(model, tokenizer, text):
+    encodings = tokenizer(text, return_tensors="pt")
+    max_length = model.config.max_position_embeddings
+    
+    nlls = []
+    for i in range(0, encodings.input_ids.size(1), max_length):
+        begin_loc = i
+        end_loc = min(i + max_length, encodings.input_ids.size(1))
+        input_ids = encodings.input_ids[:, begin_loc:end_loc].to(model.device)
+        
+        with torch.no_grad():
+            outputs = model(input_ids, labels=input_ids)
+            neg_log_likelihood = outputs.loss
+        
+        nlls.append(neg_log_likelihood)
+    
+    ppl = torch.exp(torch.stack(nlls).mean())
+    return ppl.item()
+
+# Evaluate
+test_text = "This is a test sentence for perplexity calculation."
+perplexity = calculate_perplexity(merged_model, tokenizer, test_text)
+print(f"Perplexity: {perplexity:.2f}")
+# Lower perplexity = better model
+```
+
+### Generation Quality
+
+```python
+# Generate multiple samples for comparison
+prompts = [
+    "Explain quantum computing in simple terms.",
+    "Write a Python function to reverse a string.",
+    "What are the benefits of exercise?"
+]
+
+for prompt in prompts:
+    formatted = f"<|user|>\n{prompt}</s>\n<|assistant|>\n"
+    output = pipe(formatted, max_new_tokens=100)[0]["generated_text"]
+    print(f"Prompt: {prompt}")
+    print(f"Response: {output}\n")
+```
+
+## Advanced Techniques
+
+### Multi-Epoch Training
+
+```python
+training_arguments = TrainingArguments(
+    num_train_epochs=3,  # Multiple epochs
+    evaluation_strategy="epoch",
+    save_strategy="epoch",
+    load_best_model_at_end=True,
+    metric_for_best_model="loss",
+)
+```
+
+### Gradient Accumulation
+
+```python
+# Simulate larger batch size with limited VRAM
+training_arguments = TrainingArguments(
+    per_device_train_batch_size=1,  # Small batch
+    gradient_accumulation_steps=16,  # Accumulate gradients
+    # Effective batch size = 1 * 16 = 16
+)
+```
+
+### Learning Rate Scheduling
+
+<Tabs>
+
+<Tab title="Cosine Decay">
+
+```python
+training_arguments = TrainingArguments(
+    learning_rate=2e-4,
+    lr_scheduler_type="cosine",
+    warmup_steps=100,
+)
+```
+
+Smooth decay, good for most cases.
+
+</Tab>
+
+<Tab title="Linear Decay">
+
+```python
+training_arguments = TrainingArguments(
+    learning_rate=2e-4,
+    lr_scheduler_type="linear",
+    warmup_steps=100,
+)
+```
+
+Steady decay, predictable behavior.
+
+</Tab>
+
+<Tab title="Constant with Warmup">
+
+```python
+training_arguments = TrainingArguments(
+    learning_rate=2e-4,
+    lr_scheduler_type="constant_with_warmup",
+    warmup_steps=100,
+)
+```
+
+Constant LR after warmup, good for small datasets.
+
+</Tab>
+
+</Tabs>
+
+## Deployment Considerations
+
+### Model Formats
+
+```python
+# Save in different formats
+
+# 1. HuggingFace format (default)
+merged_model.save_pretrained("model-hf")
+
+# 2. GGUF for llama.cpp (CPU inference)
+# Use llama.cpp conversion script
+
+# 3. ONNX for optimized inference
+from optimum.onnxruntime import ORTModelForCausalLM
+
+ort_model = ORTModelForCausalLM.from_pretrained(
+    "model-hf",
+    export=True,
+)
+ort_model.save_pretrained("model-onnx")
+```
+
+### Inference Optimization
+
+```python
+# Load with optimizations
+from transformers import AutoModelForCausalLM
+
+model = AutoModelForCausalLM.from_pretrained(
+    "model-hf",
+    device_map="auto",
+    torch_dtype=torch.float16,  # Half precision
+    low_cpu_mem_usage=True,
+)
+
+# Enable Flash Attention 2 (requires installation)
+# model = AutoModelForCausalLM.from_pretrained(
+#     "model-hf",
+#     attn_implementation="flash_attention_2",
+# )
+```
+
+### Quantization for Deployment
+
+```python
+# 8-bit quantization (better quality)
+model = AutoModelForCausalLM.from_pretrained(
+    "model-hf",
+    load_in_8bit=True,
+    device_map="auto",
+)
+
+# 4-bit quantization (smaller size)
+model = AutoModelForCausalLM.from_pretrained(
+    "model-hf",
+    load_in_4bit=True,
+    device_map="auto",
+)
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+
+<Accordion title="Training loss not decreasing">
+
+**Symptoms**: Loss stays high or increases
+
+**Solutions**:
+- Reduce learning rate (try 1e-4 instead of 2e-4)
+- Increase warmup steps
+- Check data format matches template
+- Verify gradient accumulation is working
+- Ensure tokenizer padding is correct
+
+```python
+training_arguments = TrainingArguments(
+    learning_rate=1e-4,  # Reduced
+    warmup_steps=200,  # Increased
+)
+```
+
+</Accordion>
+
+<Accordion title="Out of memory during training">
+
+**Symptoms**: CUDA OOM errors
+
+**Solutions**:
+- Reduce batch size to 1
+- Increase gradient accumulation
+- Enable gradient checkpointing
+- Reduce `max_seq_length`
+- Use 4-bit instead of 8-bit quantization
+
+```python
+training_arguments = TrainingArguments(
+    per_device_train_batch_size=1,
+    gradient_accumulation_steps=8,
+    gradient_checkpointing=True,
+)
+
+trainer = SFTTrainer(
+    max_seq_length=256,  # Reduced from 512
+    ...
+)
+```
+
+</Accordion>
+
+<Accordion title="Model generates repetitive text">
+
+**Symptoms**: Output repeats same phrases
+
+**Solutions**:
+- Adjust generation parameters
+- Train for fewer epochs (may be overfitting)
+- Increase temperature
+- Use different sampling strategies
+
+```python
+output = pipe(
+    prompt,
+    max_new_tokens=200,
+    temperature=0.8,  # Increased randomness
+    top_p=0.95,
+    repetition_penalty=1.2,  # Penalize repetition
+    do_sample=True,
+)
+```
+
+</Accordion>
+
+<Accordion title="Poor instruction following">
+
+**Symptoms**: Model doesn't follow instructions well
+
+**Solutions**:
+- Ensure chat template is correct
+- Train on more diverse instructions
+- Increase training epochs
+- Check data quality (chosen > rejected in DPO)
+- Verify `target_modules` includes all attention layers
+
+</Accordion>
+
+</AccordionGroup>
+
+## Cost Analysis
+
+### Training Costs
+
+| Setup | GPU | Time (3K samples) | Cloud Cost* |
+|-------|-----|------------------|-------------|
+| Full FP32 | A100 80GB | 5 min | $0.50 |
+| QLoRA | T4 16GB | 15 min | $0.10 |
+| QLoRA | A10G 24GB | 8 min | $0.15 |
+
+*Approximate AWS/GCP pricing
+
+### Inference Costs
+
+| Model Size | Quantization | VRAM | Tokens/sec |
+|-----------|-------------|------|------------|
+| 7B | FP16 | 14GB | 20-30 |
+| 7B | 8-bit | 7GB | 25-35 |
+| 7B | 4-bit | 4GB | 15-25 |
+
+## Full Colab Notebook
+
+<Card
+  title="Chapter 12: Fine-Tuning Generation Models"
+  icon="google"
+  href="https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter12/Chapter%2012%20-%20Fine-tuning%20Generation%20Models.ipynb"
+>
+  Complete implementation of SFT, QLoRA, DPO, and inference examples
+</Card>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card
+  title="Prompt Engineering"
+  icon="comments"
+  href="/advanced/prompt-engineering"
+>
+  Learn advanced prompting before fine-tuning
+</Card>
+
+<Card
+  title="Classification Fine-Tuning"
+  icon="chart-line"
+  href="/development/fine-tuning-classification"
+>
+  Fine-tune models for classification tasks
+</Card>
+
+</CardGroup>

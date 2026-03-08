@@ -1,0 +1,482 @@
+---
+title: 'Tokens and Embeddings'
+description: 'Understanding how language models represent text through tokenization and embeddings'
+icon: 'puzzle-piece'
+---
+
+## Overview
+
+Before language models can process text, they must convert it into a numerical representation. This chapter explores **tokenization** (breaking text into smaller units) and **embeddings** (representing those units as vectors), two fundamental concepts that make language AI possible.
+
+<Note>
+This chapter corresponds to **Chapter 2** of the Hands-On Large Language Models book, covering tokens, tokenizers, and token embeddings.
+</Note>
+
+## What You'll Learn
+
+<Steps>
+  <Step title="Tokenization Fundamentals">
+    How text is broken down into tokens that models can process
+  </Step>
+  <Step title="Tokenizer Comparison">
+    Compare different tokenization strategies (WordPiece, BPE, SentencePiece)
+  </Step>
+  <Step title="Token Embeddings">
+    Learn how tokens are converted to dense vector representations
+  </Step>
+  <Step title="Practical Tokenization">
+    Work with tokenizers from popular models like BERT, GPT, and Phi-3
+  </Step>
+</Steps>
+
+## Why Tokenization Matters
+
+Neural networks can only process numbers, not raw text. Tokenization solves this by:
+
+1. **Breaking text into manageable units** (words, subwords, or characters)
+2. **Mapping each unit to a unique integer ID**
+3. **Creating a fixed vocabulary** the model can learn from
+
+Different tokenization strategies have profound impacts on model performance, especially for:
+- Multilingual text
+- Code and programming languages  
+- Rare words and technical terminology
+- Mathematical expressions and numbers
+
+## Setting Up
+
+<Tabs>
+  <Tab title="Google Colab">
+    ```bash
+    pip install transformers==4.41.2 sentence-transformers==3.0.1 \
+                gensim==4.3.2 scikit-learn==1.5.0 accelerate==0.31.0
+    ```
+  </Tab>
+  <Tab title="Local Environment">
+    ```bash
+    pip install transformers==4.41.2 sentence-transformers==3.0.1 \
+                gensim==4.3.2 scikit-learn==1.5.0 accelerate==0.31.0
+    ```
+  </Tab>
+</Tabs>
+
+## Tokenization in Action
+
+### Loading a Model and Tokenizer
+
+Let's start by loading the Phi-3 model and examining how it tokenizes text:
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Load model and tokenizer
+model = AutoModelForCausalLM.from_pretrained(
+    "microsoft/Phi-3-mini-4k-instruct",
+    device_map="cuda",
+    torch_dtype="auto",
+    trust_remote_code=False,
+)
+tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+```
+
+### Tokenizing Text
+
+Here's how a simple prompt gets tokenized:
+
+```python
+prompt = "Write an email apologizing to Sarah for the tragic gardening mishap. Explain how it happened."
+
+# Tokenize the input prompt
+input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to("cuda")
+
+print(input_ids)
+```
+
+**Output:**
+```
+tensor([[    1, 14350,   385,  4876, 27746,  5281,   304, 19235,   363,   278,
+         25305,   293, 16423,   292,   286,   728,   481, 29889, 12027,  7420,
+           920,   372,  9559, 29889, 32001]], device='cuda:0')
+```
+
+Each number represents a unique token in the model's vocabulary.
+
+### Decoding Individual Tokens
+
+To see what each token represents:
+
+```python
+for id in input_ids[0]:
+    print(tokenizer.decode(id))
+```
+
+**Output:**
+```
+<s>
+Write
+an
+email
+apolog
+izing
+to
+Sarah
+for
+the
+trag
+ic
+garden
+ing
+m
+ish
+ap
+.
+Exp
+lain
+how
+it
+happened
+.
+<|assistant|>
+```
+
+<Warning>
+Notice how words like "apologizing" are broken into subword tokens: `apolog` + `izing`. This subword approach allows models to handle rare or unseen words by combining familiar pieces.
+</Warning>
+
+## Comparing Tokenizers
+
+Different models use different tokenization strategies. Let's compare how various tokenizers handle the same text.
+
+### Visualization Function
+
+```python
+from transformers import AutoTokenizer
+
+colors_list = [
+    '102;194;165', '252;141;98', '141;160;203',
+    '231;138;195', '166;216;84', '255;217;47'
+]
+
+def show_tokens(sentence, tokenizer_name):
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+    token_ids = tokenizer(sentence).input_ids
+    for idx, t in enumerate(token_ids):
+        print(
+            f'\x1b[0;30;48;2;{colors_list[idx % len(colors_list)]}m' +
+            tokenizer.decode(t) +
+            '\x1b[0m',
+            end=' '
+        )
+```
+
+### Test Text
+
+```python
+text = """
+English and CAPITALIZATION
+🎵 鸟
+show_tokens False None elif == >= else: two tabs:"    " Three tabs: "       "
+12.0*50=600
+"""
+```
+
+### Tokenizer Comparisons
+
+<Tabs>
+  <Tab title="BERT (WordPiece)">
+    ```python
+    show_tokens(text, "bert-base-uncased")
+    ```
+    
+    **Characteristics:**
+    - Lowercases all text
+    - Uses `##` prefix for subword continuations
+    - Replaces unknown characters with `[UNK]`
+    - Adds special tokens: `[CLS]`, `[SEP]`
+  </Tab>
+  
+  <Tab title="BERT-Cased (WordPiece)">
+    ```python
+    show_tokens(text, "bert-base-cased")
+    ```
+    
+    **Characteristics:**
+    - Preserves capitalization
+    - Better for tasks where case matters (e.g., named entity recognition)
+    - Larger vocabulary to handle both cases
+  </Tab>
+  
+  <Tab title="GPT-2 (BPE)">
+    ```python
+    show_tokens(text, "gpt2")
+    ```
+    
+    **Characteristics:**
+    - Byte Pair Encoding (BPE)
+    - Leading spaces indicate start of words
+    - Efficient for English text
+    - No explicit unknown token
+  </Tab>
+  
+  <Tab title="T5 (SentencePiece)">
+    ```python
+    show_tokens(text, "google/flan-t5-small")
+    ```
+    
+    **Characteristics:**
+    - Language-agnostic tokenization
+    - Better multilingual support
+    - Uses `<unk>` for unknown tokens
+    - No pre-tokenization step
+  </Tab>
+  
+  <Tab title="GPT-4 (BPE)">
+    ```python
+    show_tokens(text, "Xenova/gpt-4")
+    ```
+    
+    **Characteristics:**
+    - Improved BPE algorithm
+    - Better handling of whitespace and punctuation
+    - Optimized for code and multilingual text
+  </Tab>
+  
+  <Tab title="StarCoder (BPE)">
+    ```python
+    show_tokens(text, "bigcode/starcoder2-15b")
+    ```
+    
+    **Characteristics:**
+    - Optimized for programming languages
+    - Preserves code structure (indentation, operators)
+    - Specialized tokens for common code patterns
+  </Tab>
+</Tabs>
+
+## Decoding Token Composition
+
+Tokens can combine in interesting ways. Let's explore:
+
+```python
+print(tokenizer.decode(3323))   # "Sub"
+print(tokenizer.decode(622))    # "ject"
+print(tokenizer.decode([3323, 622]))  # "Subject"
+print(tokenizer.decode(29901))  # ":"
+```
+
+**Output:**
+```
+Sub
+ject
+Subject
+:
+```
+
+<Tip>
+When multiple tokens are decoded together, the tokenizer intelligently reconstructs the original text, including proper spacing and punctuation.
+</Tip>
+
+## Token Embeddings
+
+Once text is tokenized, each token ID is converted to a dense vector (embedding) that the model can process.
+
+### How Embeddings Work
+
+<CardGroup cols={2}>
+  <Card title="Token to ID" icon="hashtag">
+    Each token in the vocabulary gets a unique integer ID (e.g., "apple" → 15234)
+  </Card>
+  <Card title="ID to Embedding" icon="vector-square">
+    The ID is used to look up a learned vector (e.g., [0.23, -0.45, 0.67, ...])
+  </Card>
+</CardGroup>
+
+For Phi-3, each token becomes a **3,072-dimensional vector**. These embeddings:
+
+- Capture semantic meaning (similar words have similar vectors)
+- Are learned during training on massive text corpora
+- Serve as input to the transformer layers
+
+### Embedding Layer
+
+In the model architecture, token embeddings are the first layer:
+
+```python
+print(model.model.embed_tokens)
+```
+
+**Output:**
+```
+Embedding(32064, 3072, padding_idx=32000)
+```
+
+This means:
+- **32,064** tokens in the vocabulary
+- Each token maps to a **3,072-dimensional** embedding
+- Token ID `32000` is reserved for padding
+
+## Tokenization Strategies Compared
+
+<AccordionGroup>
+  <Accordion title="Word-Level Tokenization">
+    **Approach:** Split text by spaces and punctuation
+    
+    **Pros:**
+    - Simple and intuitive
+    - Each word is a single token
+    
+    **Cons:**
+    - Massive vocabularies (100K+ words)
+    - Can't handle rare or misspelled words
+    - Inefficient for morphologically rich languages
+    
+    **Used by:** Early NLP models, bag-of-words approaches
+  </Accordion>
+  
+  <Accordion title="Character-Level Tokenization">
+    **Approach:** Each character is a token
+    
+    **Pros:**
+    - Tiny vocabulary (~100 characters)
+    - No unknown words
+    - Can handle any text
+    
+    **Cons:**
+    - Very long sequences
+    - Harder for models to learn word-level patterns
+    - Computationally expensive
+    
+    **Used by:** Some specialized architectures
+  </Accordion>
+  
+  <Accordion title="Subword Tokenization (BPE)">
+    **Approach:** Learn frequent subword units from data
+    
+    **Pros:**
+    - Balanced vocabulary size (30K-100K)
+    - Handles rare words via subword composition
+    - Efficient for most languages
+    
+    **Cons:**
+    - Non-deterministic segmentation
+    - May split words awkwardly
+    
+    **Used by:** GPT-2, GPT-3, GPT-4, RoBERTa
+  </Accordion>
+  
+  <Accordion title="WordPiece Tokenization">
+    **Approach:** Similar to BPE, optimizes likelihood
+    
+    **Pros:**
+    - Good balance of vocabulary and sequence length
+    - Special markers for word boundaries (##)
+    
+    **Cons:**
+    - Requires pre-tokenization step
+    - Less efficient for non-English languages
+    
+    **Used by:** BERT, DistilBERT, ELECTRA
+  </Accordion>
+  
+  <Accordion title="SentencePiece">
+    **Approach:** Language-agnostic, treats text as raw sequence
+    
+    **Pros:**
+    - No language-specific rules
+    - Excellent for multilingual models
+    - Reversible tokenization
+    
+    **Cons:**
+    - May be less optimal for English-only tasks
+    
+    **Used by:** T5, ALBERT, mT5, XLM-RoBERTa
+  </Accordion>
+</AccordionGroup>
+
+## Practical Implications
+
+### Vocabulary Size vs Sequence Length
+
+There's a fundamental tradeoff:
+
+- **Larger vocabulary** → Fewer tokens per text → Faster processing
+- **Smaller vocabulary** → More tokens per text → Slower processing
+
+Most modern models use 30K-100K token vocabularies to balance these concerns.
+
+### Special Tokens
+
+Tokenizers include special tokens for various purposes:
+
+```python
+tokenizer.special_tokens_map
+```
+
+**Common special tokens:**
+- `<s>`, `</s>` - Start/end of sequence
+- `<pad>` - Padding for batching
+- `<unk>` - Unknown tokens
+- `<|assistant|>`, `<|user|>` - Role markers for chat models
+
+<Warning>
+Special tokens are crucial for model performance. Never remove or modify them unless you understand their purpose.
+</Warning>
+
+## Hands-On Exercise
+
+Try tokenizing different types of text to see how tokenizers handle various inputs:
+
+<CodeGroup>
+```python English Text
+text = "The quick brown fox jumps over the lazy dog."
+show_tokens(text, "gpt2")
+```
+
+```python Code
+code = "def fibonacci(n): return n if n <= 1 else fibonacci(n-1) + fibonacci(n-2)"
+show_tokens(code, "bigcode/starcoder2-15b")
+```
+
+```python Multilingual
+text = "Hello! Bonjour! 你好! مرحبا! Здравствуйте!"
+show_tokens(text, "google/flan-t5-small")
+```
+
+```python Numbers and Math
+text = "π ≈ 3.14159, e ≈ 2.71828, φ ≈ 1.61803"
+show_tokens(text, "Xenova/gpt-4")
+```
+</CodeGroup>
+
+## Run the Full Notebook
+
+<Card title="Chapter 2 Notebook" icon="rocket" href="https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter02/Chapter%202%20-%20Tokens%20and%20Token%20Embeddings.ipynb">
+  Explore tokenization with interactive examples in Google Colab
+</Card>
+
+## Key Takeaways
+
+<Check>Tokenization converts text into integer IDs that models can process</Check>
+<Check>Different tokenizers (BPE, WordPiece, SentencePiece) have different strengths</Check>
+<Check>Subword tokenization balances vocabulary size and sequence length</Check>
+<Check>Token embeddings convert IDs to dense vectors with semantic meaning</Check>
+<Check>Special tokens serve important roles in model input/output</Check>
+
+## Next Steps
+
+Now that you understand how text becomes tokens and embeddings, let's explore what happens inside the model:
+
+<CardGroup cols={2}>
+  <Card title="Introduction to Language Models" icon="brain" href="/fundamentals/language-models">
+    Go back to review the basics of loading and running models
+  </Card>
+  <Card title="Transformer Architecture" icon="sitemap" href="/fundamentals/transformer-architecture">
+    Dive deep into the neural network that processes these embeddings
+  </Card>
+</CardGroup>
+
+---
+
+<Tip>
+**Key Insight:** Tokenization is not just a preprocessing step—it fundamentally shapes what a language model can learn and how it represents language. Understanding tokenization helps you debug model behavior and choose the right model for your task.
+</Tip>

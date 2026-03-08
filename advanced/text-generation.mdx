@@ -1,0 +1,490 @@
+---
+title: "Advanced Text Generation"
+description: "Go beyond prompt engineering with chains, memory, and agents"
+icon: "link"
+---
+
+Advanced text generation techniques leverage orchestration frameworks like LangChain to build complex, stateful applications with LLMs. Learn to create multi-step workflows, maintain conversation memory, and build autonomous agents.
+
+## Overview
+
+While prompt engineering focuses on crafting individual prompts, advanced generation techniques involve:
+- **Chains**: Sequential LLM calls with intermediate processing
+- **Memory**: Maintaining context across interactions
+- **Agents**: Autonomous systems that use tools and make decisions
+
+**When to use these techniques:**
+- Multi-step reasoning tasks
+- Conversational applications
+- Task automation with external tools
+- Complex workflows requiring state management
+
+## Setting Up LangChain
+
+### Loading an LLM
+
+```python
+from langchain_community.llms import LlamaCpp
+
+# Load a local model with LangChain
+llm = LlamaCpp(
+    model_path="Phi-3-mini-4k-instruct-fp16.gguf",
+    n_gpu_layers=-1,
+    max_tokens=500,
+    n_ctx=2048,
+    seed=42,
+    verbose=False
+)
+
+# Simple invocation
+response = llm.invoke("Hi! My name is Maarten. What is 1 + 1?")
+print(response)
+```
+
+<Note>
+Download the model first:
+```bash
+wget https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-fp16.gguf
+```
+</Note>
+
+## Chains
+
+### Basic Chains
+
+Chains connect prompts with LLMs for reusable workflows:
+
+```python
+from langchain.prompts import PromptTemplate
+
+# Create a prompt template with variables
+template = """<s><|user|>
+{input_prompt}<|end|>
+<|assistant|>"""
+
+prompt = PromptTemplate(
+    template=template,
+    input_variables=["input_prompt"]
+)
+
+# Chain the prompt with the LLM using the pipe operator
+basic_chain = prompt | llm
+
+# Use the chain
+result = basic_chain.invoke({
+    "input_prompt": "Hi! My name is Maarten. What is 1 + 1?",
+})
+print(result)
+# Output: " Hello Maarten, the answer to 1 + 1 is 2."
+```
+
+### Multi-Step Chains
+
+Create complex workflows by chaining multiple components:
+
+<Steps>
+  <Step title="Create Title Chain">
+    ```python
+    from langchain.chains import LLMChain
+    
+    # Chain for generating a story title
+    template = """<s><|user|>
+    Create a title for a story about {summary}. Only return the title.<|end|>
+    <|assistant|>"""
+    title_prompt = PromptTemplate(template=template, input_variables=["summary"])
+    title = LLMChain(llm=llm, prompt=title_prompt, output_key="title")
+    ```
+  </Step>
+  <Step title="Create Character Chain">
+    ```python
+    # Chain for character description
+    template = """<s><|user|>
+    Describe the main character of a story about {summary} with the title {title}. 
+    Use only two sentences.<|end|>
+    <|assistant|>"""
+    character_prompt = PromptTemplate(
+        template=template, 
+        input_variables=["summary", "title"]
+    )
+    character = LLMChain(llm=llm, prompt=character_prompt, output_key="character")
+    ```
+  </Step>
+  <Step title="Create Story Chain">
+    ```python
+    # Chain for the full story
+    template = """<s><|user|>
+    Create a story about {summary} with the title {title}. 
+    The main character is: {character}. 
+    Only return the story and it cannot be longer than one paragraph<|end|>
+    <|assistant|>"""
+    story_prompt = PromptTemplate(
+        template=template, 
+        input_variables=["summary", "title", "character"]
+    )
+    story = LLMChain(llm=llm, prompt=story_prompt, output_key="story")
+    ```
+  </Step>
+  <Step title="Combine All Chains">
+    ```python
+    # Combine all three components
+    llm_chain = title | character | story
+    
+    # Execute the full chain
+    result = llm_chain.invoke("a girl that lost her mother")
+    print(result['story'])
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+Use `output_key` to name outputs from each chain, making them available as inputs to subsequent chains.
+</Tip>
+
+## Memory
+
+Memory enables LLMs to maintain context across multiple interactions.
+
+### The Problem: Stateless Models
+
+By default, LLMs don't remember previous interactions:
+
+```python
+# First interaction
+basic_chain.invoke({"input_prompt": "Hi! My name is Maarten. What is 1 + 1?"})
+# Output: "Hello Maarten! The answer to 1 + 1 is 2."
+
+# Second interaction - the model doesn't remember
+basic_chain.invoke({"input_prompt": "What is my name?"})
+# Output: "I'm unable to determine your name..."
+```
+
+### ConversationBufferMemory
+
+Store complete conversation history:
+
+```python
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import LLMChain
+
+# Create prompt template with chat history
+template = """<s><|user|>Current conversation:{chat_history}
+
+{input_prompt}<|end|>
+<|assistant|>"""
+
+prompt = PromptTemplate(
+    template=template,
+    input_variables=["input_prompt", "chat_history"]
+)
+
+# Define memory
+memory = ConversationBufferMemory(memory_key="chat_history")
+
+# Chain with memory
+llm_chain = LLMChain(
+    prompt=prompt,
+    llm=llm,
+    memory=memory
+)
+
+# First interaction
+llm_chain.invoke({"input_prompt": "Hi! My name is Maarten. What is 1 + 1?"})
+# Output: "Hello Maarten! The answer to 1 + 1 is 2. Hope you're having a great day!"
+
+# Second interaction - now it remembers!
+llm_chain.invoke({"input_prompt": "What is my name?"})
+# Output: "Your name is Maarten."
+```
+
+### ConversationBufferWindowMemory
+
+Retain only the last N interactions:
+
+```python
+from langchain.memory import ConversationBufferWindowMemory
+
+# Retain only the last 2 conversations
+memory = ConversationBufferWindowMemory(k=2, memory_key="chat_history")
+
+llm_chain = LLMChain(
+    prompt=prompt,
+    llm=llm,
+    memory=memory
+)
+
+# After multiple interactions
+llm_chain.invoke({"input_prompt":"Hi! My name is Maarten and I am 33 years old. What is 1 + 1?"})
+llm_chain.invoke({"input_prompt":"What is 3 + 3?"})
+llm_chain.invoke({"input_prompt":"What is my name?"})
+# Output: "Your name is Maarten."
+
+llm_chain.invoke({"input_prompt":"What is my age?"})
+# Output: "I'm unable to determine your age..." (too far back!)
+```
+
+<Warning>
+Buffer window memory may lose important context. Use it when only recent interactions matter.
+</Warning>
+
+### ConversationSummaryMemory
+
+Summarize conversation history to save tokens:
+
+```python
+from langchain.memory import ConversationSummaryMemory
+
+# Custom summary prompt
+summary_prompt_template = """<s><|user|>Summarize the conversations and update with the new lines.
+
+Current summary:
+{summary}
+
+new lines of conversation:
+{new_lines}
+
+New summary:<|end|>
+<|assistant|>"""
+
+summary_prompt = PromptTemplate(
+    input_variables=["new_lines", "summary"],
+    template=summary_prompt_template
+)
+
+# Create summary memory
+memory = ConversationSummaryMemory(
+    llm=llm,
+    memory_key="chat_history",
+    prompt=summary_prompt
+)
+
+llm_chain = LLMChain(
+    prompt=prompt,
+    llm=llm,
+    memory=memory
+)
+
+# Interactions are automatically summarized
+llm_chain.invoke({"input_prompt": "Hi! My name is Maarten. What is 1 + 1?"})
+llm_chain.invoke({"input_prompt": "What is my name?"})
+
+# Check the summary
+print(memory.load_memory_variables({}))
+# Output: Summary of all interactions in compressed form
+```
+
+<Accordion title="Memory Comparison">
+| Memory Type | Pros | Cons | Best For |
+|------------|------|------|----------|
+| **Buffer** | Complete context | Token usage grows | Short conversations |
+| **Buffer Window** | Controlled size | Loses old context | Recent context only |
+| **Summary** | Efficient tokens | Summarization overhead | Long conversations |
+</Accordion>
+
+## Agents
+
+Agents autonomously decide which actions to take using tools and reasoning.
+
+### ReAct Pattern
+
+Reasoning + Acting framework for agent decision-making:
+
+<CodeGroup>
+```python Setup Tools
+import os
+from langchain_openai import ChatOpenAI
+from langchain.agents import load_tools, Tool
+from langchain.tools import DuckDuckGoSearchResults
+
+# Load OpenAI LLM for agents
+os.environ["OPENAI_API_KEY"] = "YOUR_KEY"
+openai_llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+
+# Create search tool
+search = DuckDuckGoSearchResults()
+search_tool = Tool(
+    name="duckduck",
+    description="A web search engine. Use this to as a search engine for general queries.",
+    func=search.run,
+)
+
+# Load math tool
+tools = load_tools(["llm-math"], llm=openai_llm)
+tools.append(search_tool)
+```
+
+```python Create Agent
+from langchain.agents import AgentExecutor, create_react_agent
+from langchain.prompts import PromptTemplate
+
+# ReAct template
+react_template = """Answer the following questions as best you can. You have access to the following tools:
+
+{tools}
+
+Use the following format:
+
+Question: the input question you must answer
+Thought: you should always think about what to do
+Action: the action to take, should be one of [{tool_names}]
+Action Input: the input to the action
+Observation: the result of the action
+... (this Thought/Action/Action Input/Observation can repeat N times)
+Thought: I now know the final answer
+Final Answer: the final answer to the original input question
+
+Begin!
+
+Question: {input}
+Thought:{agent_scratchpad}"""
+
+prompt = PromptTemplate(
+    template=react_template,
+    input_variables=["tools", "tool_names", "input", "agent_scratchpad"]
+)
+
+# Construct the agent
+agent = create_react_agent(openai_llm, tools, prompt)
+agent_executor = AgentExecutor(
+    agent=agent, 
+    tools=tools, 
+    verbose=True, 
+    handle_parsing_errors=True
+)
+```
+
+```python Run Agent
+# Ask a complex question requiring multiple tools
+result = agent_executor.invoke({
+    "input": "What is the current price of a MacBook Pro in USD? How much would it cost in EUR if the exchange rate is 0.85 EUR for 1 USD?"
+})
+
+print(result)
+```
+</CodeGroup>
+
+### Agent Execution Example
+
+```plaintext
+> Entering new AgentExecutor chain...
+I need to find the current price of a MacBook Pro in USD first before converting it to EUR.
+Action: duckduck
+Action Input: "current price of MacBook Pro in USD"
+
+Observation: [snippet: View at Best Buy. The best MacBook Pro overall... $2,249.00...]
+
+Thought: I found the current price of a MacBook Pro in USD, now I need to convert it to EUR.
+Action: Calculator
+Action Input: $2,249.00 * 0.85
+
+Observation: Answer: 1911.65
+
+Thought: I now know the final answer
+Final Answer: The current price of a MacBook Pro in USD is $2,249.00. It would cost approximately 1911.65 EUR with an exchange rate of 0.85 EUR for 1 USD.
+
+> Finished chain.
+```
+
+<Tip>
+Agents shine when tasks require:
+- Web searches
+- Calculations
+- Database queries
+- API calls
+- Multi-step reasoning
+</Tip>
+
+## Integration with LLM Providers
+
+LangChain supports multiple providers:
+
+<Tabs>
+  <Tab title="OpenAI">
+    ```python
+    from langchain_openai import ChatOpenAI
+    
+    llm = ChatOpenAI(
+        model_name="gpt-4",
+        temperature=0.7,
+        api_key="YOUR_KEY"
+    )
+    ```
+  </Tab>
+  <Tab title="Cohere">
+    ```python
+    from langchain_community.llms import Cohere
+    
+    llm = Cohere(
+        model="command",
+        cohere_api_key="YOUR_KEY"
+    )
+    ```
+  </Tab>
+  <Tab title="Local (llama.cpp)">
+    ```python
+    from langchain_community.llms import LlamaCpp
+    
+    llm = LlamaCpp(
+        model_path="path/to/model.gguf",
+        n_gpu_layers=-1,
+        n_ctx=2048
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Chain Design">
+    - Keep chains focused on specific tasks
+    - Use descriptive output keys
+    - Test each chain component independently
+    - Handle errors gracefully
+  </Accordion>
+  <Accordion title="Memory Management">
+    - Choose memory type based on conversation length
+    - Monitor token usage with buffer memory
+    - Consider summarization for long conversations
+    - Clear memory when starting new topics
+  </Accordion>
+  <Accordion title="Agent Safety">
+    - Validate tool outputs
+    - Set iteration limits
+    - Use `handle_parsing_errors=True`
+    - Monitor agent costs (API calls)
+  </Accordion>
+</AccordionGroup>
+
+## Common Pitfalls
+
+<Warning>
+**Memory Leaks**: Buffer memory can grow indefinitely. Use window or summary memory for long conversations.
+</Warning>
+
+<Warning>
+**Agent Loops**: Agents may get stuck in reasoning loops. Set `max_iterations` to prevent runaway execution.
+</Warning>
+
+<Warning>
+**Tool Errors**: Always handle tool failures gracefully. Use `handle_parsing_errors=True` in AgentExecutor.
+</Warning>
+
+## Try It Yourself
+
+<Card title="Interactive Notebook" icon="flask" href="https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter07/Chapter%207%20-%20Advanced%20Text%20Generation%20Techniques%20and%20Tools.ipynb">
+  Explore chains, memory, and agents in this hands-on Colab notebook from Chapter 7.
+</Card>
+
+## Related Techniques
+
+<CardGroup cols={3}>
+  <Card title="Prompt Engineering" icon="wand-magic-sparkles" href="/advanced/prompt-engineering">
+    Foundational prompting techniques
+  </Card>
+  <Card title="Semantic Search" icon="magnifying-glass" href="/advanced/semantic-search-rag">
+    Retrieval for grounded generation
+  </Card>
+  <Card title="Multimodal LLMs" icon="images" href="/advanced/multimodal-llms">
+    Vision and language integration
+  </Card>
+</CardGroup>

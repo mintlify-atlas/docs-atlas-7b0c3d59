@@ -1,0 +1,313 @@
+---
+title: "Prompt Engineering"
+description: "Master the art of crafting effective prompts to maximize LLM performance"
+icon: "wand-magic-sparkles"
+---
+
+Prompt engineering is a fundamental technique for improving LLM outputs through careful instruction design. This chapter explores methods to structure prompts that guide models toward better, more accurate responses.
+
+## Overview
+
+Prompt engineering involves designing input text to elicit desired behaviors from language models. Through systematic prompt construction, you can significantly improve model performance without additional training.
+
+**When to use prompt engineering:**
+- Improving response quality and accuracy
+- Reducing hallucinations
+- Guiding output format and style
+- Implementing few-shot learning
+- Complex reasoning tasks
+
+## Key Concepts
+
+### Basic Prompt Components
+
+A well-structured prompt typically includes:
+
+1. **Persona**: Define the model's role or expertise
+2. **Instruction**: Clear task description
+3. **Context**: Background information
+4. **Data Format**: Expected output structure
+5. **Audience**: Target user considerations
+6. **Tone**: Communication style
+
+### Temperature and Sampling
+
+<Tabs>
+  <Tab title="Temperature">
+    Controls randomness in generation:
+    - **Low (0.0-0.3)**: Deterministic, focused outputs
+    - **Medium (0.4-0.7)**: Balanced creativity
+    - **High (0.8-1.0)**: More creative, diverse outputs
+  </Tab>
+  <Tab title="Top-p (Nucleus)">
+    Alternative sampling method that selects from tokens comprising top probability mass.
+  </Tab>
+</Tabs>
+
+## Loading a Model
+
+First, let's set up a local LLM using Transformers:
+
+```python
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+
+# Load model and tokenizer
+model = AutoModelForCausalLM.from_pretrained(
+    "microsoft/Phi-3-mini-4k-instruct",
+    device_map="cuda",
+    torch_dtype="auto",
+    trust_remote_code=False,
+)
+tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+
+# Create a pipeline
+pipe = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer,
+    return_full_text=False,
+    max_new_tokens=500,
+    do_sample=False,
+)
+```
+
+## Complex Prompt Engineering
+
+### Structured Prompts
+
+Combine multiple components for better control:
+
+```python
+# Prompt components
+persona = "You are an expert in Large Language models. You excel at breaking down complex papers into digestible summaries.\n"
+instruction = "Summarize the key findings of the paper provided.\n"
+context = "Your summary should extract the most crucial points that can help researchers quickly understand the most vital information of the paper.\n"
+data_format = "Create a bullet-point summary that outlines the method. Follow this up with a concise paragraph that encapsulates the main results.\n"
+audience = "The summary is designed for busy researchers that quickly need to grasp the newest trends in Large Language Models.\n"
+tone = "The tone should be professional and clear.\n"
+text = "MY TEXT TO SUMMARIZE"  # Replace with your text
+data = f"Text to summarize: {text}"
+
+# The full prompt
+query = persona + instruction + context + data_format + audience + tone + data
+
+messages = [{"role": "user", "content": query}]
+output = pipe(messages)
+print(output[0]["generated_text"])
+```
+
+<Note>
+The order and inclusion of prompt components can significantly affect output quality. Experiment with different combinations!
+</Note>
+
+## In-Context Learning
+
+### One-Shot Learning
+
+Provide a single example to guide the model:
+
+```python
+one_shot_prompt = [
+    {
+        "role": "user",
+        "content": "A 'Gigamuru' is a type of Japanese musical instrument. An example of a sentence that uses the word Gigamuru is:"
+    },
+    {
+        "role": "assistant",
+        "content": "I have a Gigamuru that my uncle gave me as a gift. I love to play it at home."
+    },
+    {
+        "role": "user",
+        "content": "To 'screeg' something is to swing a sword at it. An example of a sentence that uses the word screeg is:"
+    }
+]
+
+output = pipe(one_shot_prompt)
+print(output[0]["generated_text"])
+# Output: "During the intense duel, the knight skillfully screeged his opponent's shield..."
+```
+
+### Chain Prompting
+
+Break complex tasks into sequential steps:
+
+<Steps>
+  <Step title="Generate Product Name">
+    ```python
+    product_prompt = [
+        {"role": "user", "content": "Create a name and slogan for a chatbot that leverages LLMs."}
+    ]
+    outputs = pipe(product_prompt)
+    product_description = outputs[0]["generated_text"]
+    # Output: 'Name: "MindMeld Messenger"\nSlogan: "Unleashing Intelligent Conversations..."'
+    ```
+  </Step>
+  <Step title="Generate Sales Pitch">
+    ```python
+    sales_prompt = [
+        {"role": "user", "content": f"Generate a very short sales pitch for: '{product_description}'"}
+    ]
+    outputs = pipe(sales_prompt)
+    sales_pitch = outputs[0]["generated_text"]
+    ```
+  </Step>
+</Steps>
+
+## Reasoning Techniques
+
+### Chain-of-Thought (CoT)
+
+Encourage step-by-step reasoning:
+
+```python
+cot_prompt = [
+    {"role": "user", "content": "Roger has 5 tennis balls. He buys 2 more cans of tennis balls. Each can has 3 tennis balls. How many tennis balls does he have now?"},
+    {"role": "assistant", "content": "Roger started with 5 balls. 2 cans of 3 tennis balls each is 6 tennis balls. 5 + 6 = 11. The answer is 11."},
+    {"role": "user", "content": "The cafeteria had 23 apples. If they used 20 to make lunch and bought 6 more, how many apples do they have?"}
+]
+
+outputs = pipe(cot_prompt)
+print(outputs[0]["generated_text"])
+```
+
+<CodeGroup>
+```python Standard CoT
+cot_prompt = [
+    {"role": "user", "content": "[problem with example reasoning]"},
+    {"role": "assistant", "content": "[step-by-step solution]"},
+    {"role": "user", "content": "[new problem]"}
+]
+```
+
+```python Zero-Shot CoT
+zeroshot_cot_prompt = [
+    {"role": "user", "content": "The cafeteria had 23 apples. If they used 20 to make lunch and bought 6 more, how many apples do they have? Let's think step-by-step."}
+]
+```
+</CodeGroup>
+
+### Tree-of-Thought
+
+Explore multiple reasoning paths:
+
+```python
+zeroshot_tot_prompt = [
+    {"role": "user", "content": """Imagine three different experts are answering this question. 
+    All experts will write down 1 step of their thinking, then share it with the group. 
+    Then all experts will go on to the next step, etc. If any expert realises they're wrong 
+    at any point then they leave. The question is 'The cafeteria had 23 apples. If they used 
+    20 to make lunch and bought 6 more, how many apples do they have?' Make sure to discuss 
+    the results."""}
+]
+
+outputs = pipe(zeroshot_tot_prompt)
+print(outputs[0]["generated_text"])
+```
+
+## Output Verification
+
+### Structured Output with Examples
+
+```python
+one_shot_template = """Create a short character profile for an RPG game. Make sure to only use this format:
+
+{
+  "description": "A SHORT DESCRIPTION",
+  "name": "THE CHARACTER'S NAME",
+  "armor": "ONE PIECE OF ARMOR",
+  "weapon": "ONE OR MORE WEAPONS"
+}
+"""
+
+one_shot_prompt = [{"role": "user", "content": one_shot_template}]
+outputs = pipe(one_shot_prompt)
+print(outputs[0]["generated_text"])
+```
+
+### Grammar-Constrained Generation
+
+For guaranteed JSON output, use llama-cpp-python:
+
+```python
+from llama_cpp import Llama
+
+# Load model with llama-cpp
+llm = Llama.from_pretrained(
+    repo_id="microsoft/Phi-3-mini-4k-instruct-gguf",
+    filename="*fp16.gguf",
+    n_gpu_layers=-1,
+    n_ctx=2048,
+    verbose=False
+)
+
+# Generate with JSON format constraint
+output = llm.create_chat_completion(
+    messages=[
+        {"role": "user", "content": "Create a warrior for an RPG in JSON format."},
+    ],
+    response_format={"type": "json_object"},
+    temperature=0,
+)['choices'][0]['message']["content"]
+
+import json
+json_output = json.dumps(json.loads(output), indent=4)
+print(json_output)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Be Specific and Clear">
+    - Use precise language
+    - Avoid ambiguity
+    - Include relevant constraints
+    - Specify output format explicitly
+  </Accordion>
+  <Accordion title="Iterate and Test">
+    - Start simple, add complexity gradually
+    - Test with diverse inputs
+    - Compare different prompt variations
+    - Monitor for edge cases
+  </Accordion>
+  <Accordion title="Control Parameters">
+    - Adjust temperature for creativity vs. consistency
+    - Use lower temperatures for factual tasks
+    - Set appropriate max_tokens
+    - Consider top_p for diverse outputs
+  </Accordion>
+</AccordionGroup>
+
+## Common Pitfalls
+
+<Warning>
+**Overly Complex Prompts**: Too many instructions can confuse the model. Keep prompts focused and structured.
+</Warning>
+
+<Warning>
+**Insufficient Context**: Provide enough background information for the model to understand the task fully.
+</Warning>
+
+<Warning>
+**Ignoring Model Limitations**: Different models have different strengths. Test your prompts across models.
+</Warning>
+
+## Try It Yourself
+
+<Card title="Interactive Notebook" icon="flask" href="https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter06/Chapter%206%20-%20Prompt%20Engineering.ipynb">
+  Experiment with prompt engineering techniques in this interactive Colab notebook from Chapter 6.
+</Card>
+
+## Related Techniques
+
+<CardGroup cols={3}>
+  <Card title="Text Generation" icon="pen-to-square" href="/advanced/text-generation">
+    Advanced generation techniques and tools
+  </Card>
+  <Card title="Semantic Search" icon="magnifying-glass" href="/advanced/semantic-search-rag">
+    Retrieval-augmented generation
+  </Card>
+  <Card title="Multimodal LLMs" icon="images" href="/advanced/multimodal-llms">
+    Vision and language models
+  </Card>
+</CardGroup>

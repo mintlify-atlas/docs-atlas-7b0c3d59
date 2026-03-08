@@ -1,0 +1,520 @@
+---
+title: "Semantic Search & RAG"
+description: "Build retrieval-augmented generation systems with dense and sparse search"
+icon: "magnifying-glass"
+---
+
+Semantic search and Retrieval-Augmented Generation (RAG) enable LLMs to access external knowledge, reducing hallucinations and providing up-to-date information. Learn to implement dense retrieval, sparse search, reranking, and complete RAG pipelines.
+
+## Overview
+
+Retrieval-Augmented Generation combines information retrieval with language generation:
+1. **Retrieve** relevant documents from a knowledge base
+2. **Augment** the prompt with retrieved context
+3. **Generate** grounded, factual responses
+
+**When to use RAG:**
+- Answering questions over private documents
+- Reducing hallucinations
+- Providing verifiable sources
+- Working with frequently updated information
+- Domain-specific applications
+
+## Key Concepts
+
+### Dense vs. Sparse Retrieval
+
+<Tabs>
+  <Tab title="Dense Retrieval">
+    Uses neural embeddings to capture semantic meaning:
+    - **Pros**: Understands synonyms and context
+    - **Cons**: Computationally expensive, may miss exact matches
+    - **Example**: CLIP, Sentence-BERT, OpenAI embeddings
+  </Tab>
+  <Tab title="Sparse Retrieval">
+    Uses keyword matching (BM25, TF-IDF):
+    - **Pros**: Fast, exact term matching, interpretable
+    - **Cons**: Misses semantic relationships
+    - **Example**: BM25, Elasticsearch
+  </Tab>
+</Tabs>
+
+### Embeddings
+
+Embeddings convert text into dense vector representations that capture semantic meaning.
+
+## Dense Retrieval Example
+
+### Step 1: Prepare and Chunk Text
+
+```python
+import cohere
+import numpy as np
+
+# Initialize Cohere client
+api_key = 'YOUR_COHERE_API_KEY'
+co = cohere.Client(api_key)
+
+# Sample text about Interstellar
+text = """
+Interstellar is a 2014 epic science fiction film co-written, directed, and produced by Christopher Nolan.
+It stars Matthew McConaughey, Anne Hathaway, Jessica Chastain, Bill Irwin, Ellen Burstyn, Matt Damon, and Michael Caine.
+Set in a dystopian future where humanity is struggling to survive, the film follows a group of astronauts who travel through a wormhole near Saturn in search of a new home for mankind.
+
+Brothers Christopher and Jonathan Nolan wrote the screenplay, which had its origins in a script Jonathan developed in 2007.
+Caltech theoretical physicist and 2017 Nobel laureate in Physics Kip Thorne was an executive producer, acted as a scientific consultant, and wrote a tie-in book, The Science of Interstellar.
+"""
+
+# Split into sentences
+texts = text.split('.')
+texts = [t.strip(' \n') for t in texts if t.strip()]
+```
+
+### Step 2: Generate Embeddings
+
+```python
+# Get embeddings from Cohere
+response = co.embed(
+    texts=texts,
+    input_type="search_document",  # Optimized for document indexing
+).embeddings
+
+embeds = np.array(response)
+print(embeds.shape)  # (15, 4096) - 15 chunks, 4096 dimensions
+```
+
+<Note>
+Cohere's `embed-english-v3.0` produces 4096-dimensional embeddings. Use `input_type="search_document"` for documents and `input_type="search_query"` for queries.
+</Note>
+
+### Step 3: Build Search Index
+
+```python
+import faiss
+
+# Create FAISS index
+dim = embeds.shape[1]
+index = faiss.IndexFlatL2(dim)  # L2 distance (Euclidean)
+index.add(np.float32(embeds))
+
+print(f"Indexed {index.ntotal} vectors")
+```
+
+### Step 4: Search the Index
+
+```python
+import pandas as pd
+
+def search(query, number_of_results=3):
+    # 1. Get the query's embedding
+    query_embed = co.embed(
+        texts=[query],
+        input_type="search_query",  # Optimized for queries
+    ).embeddings[0]
+    
+    # 2. Retrieve the nearest neighbors
+    distances, similar_item_ids = index.search(
+        np.float32([query_embed]), 
+        number_of_results
+    )
+    
+    # 3. Format the results
+    texts_np = np.array(texts)
+    results = pd.DataFrame(data={
+        'texts': texts_np[similar_item_ids[0]],
+        'distance': distances[0]
+    })
+    
+    print(f"Query:'{query}'\nNearest neighbors:")
+    return results
+
+# Test semantic search
+query = "how precise was the science"
+results = search(query)
+print(results)
+```
+
+**Output:**
+```
+Query:'how precise was the science'
+Nearest neighbors:
+                                               texts      distance
+0  It has also received praise from many astronom...  10757.379883
+1  Caltech theoretical physicist and 2017 Nobel l...  11566.131836
+2  Interstellar uses extensive practical and mini...  11922.833008
+```
+
+<Tip>
+Lower distance = higher similarity. The model correctly identifies passages about scientific accuracy!
+</Tip>
+
+## Sparse Retrieval (BM25)
+
+Keyword-based search using BM25:
+
+```python
+from rank_bm25 import BM25Okapi
+from sklearn.feature_extraction import _stop_words
+import string
+
+def bm25_tokenizer(text):
+    """Tokenize and remove stop words"""
+    tokenized_doc = []
+    for token in text.lower().split():
+        token = token.strip(string.punctuation)
+        if len(token) > 0 and token not in _stop_words.ENGLISH_STOP_WORDS:
+            tokenized_doc.append(token)
+    return tokenized_doc
+
+# Tokenize corpus
+tokenized_corpus = [bm25_tokenizer(passage) for passage in texts]
+bm25 = BM25Okapi(tokenized_corpus)
+
+def keyword_search(query, top_k=3):
+    print("Input question:", query)
+    
+    # BM25 scoring
+    bm25_scores = bm25.get_scores(bm25_tokenizer(query))
+    top_n = np.argpartition(bm25_scores, -top_k)[-top_k:]
+    bm25_hits = [{'corpus_id': idx, 'score': bm25_scores[idx]} for idx in top_n]
+    bm25_hits = sorted(bm25_hits, key=lambda x: x['score'], reverse=True)
+    
+    print(f"Top-{top_k} lexical search (BM25) hits")
+    for hit in bm25_hits:
+        print(f"\t{hit['score']:.3f}\t{texts[hit['corpus_id']]}")
+
+keyword_search("how precise was the science")
+```
+
+**Output:**
+```
+Top-3 lexical search (BM25) hits
+	1.789	Interstellar is a 2014 epic science fiction film...
+	1.373	Caltech theoretical physicist and 2017 Nobel laureate...
+	0.000	It stars Matthew McConaughey, Anne Hathaway...
+```
+
+## Hybrid Search with Reranking
+
+Combine sparse and dense retrieval, then rerank:
+
+<Steps>
+  <Step title="Initial Retrieval (BM25)">
+    ```python
+    def keyword_and_reranking_search(query, top_k=3, num_candidates=10):
+        # Stage 1: BM25 retrieval (fast)
+        bm25_scores = bm25.get_scores(bm25_tokenizer(query))
+        top_n = np.argpartition(bm25_scores, -num_candidates)[-num_candidates:]
+        bm25_hits = [{'corpus_id': idx, 'score': bm25_scores[idx]} for idx in top_n]
+        bm25_hits = sorted(bm25_hits, key=lambda x: x['score'], reverse=True)
+        
+        docs = [texts[hit['corpus_id']] for hit in bm25_hits]
+    ```
+  </Step>
+  <Step title="Reranking">
+    ```python
+        # Stage 2: Rerank with Cohere
+        results = co.rerank(
+            query=query, 
+            documents=docs, 
+            top_n=top_k, 
+            return_documents=True
+        )
+        
+        print(f"\nTop-{top_k} hits by rank-API ({len(bm25_hits)} BM25 hits re-ranked)")
+        for hit in results.results:
+            print(f"\t{hit.relevance_score:.3f}\t{hit.document.text}")
+    
+    keyword_and_reranking_search("how precise was the science")
+    ```
+  </Step>
+</Steps>
+
+**Output:**
+```
+Top-3 lexical search (BM25) hits
+	1.789	Interstellar is a 2014 epic science fiction film...
+	1.373	Caltech theoretical physicist and 2017 Nobel laureate...
+
+Top-3 hits by rank-API (10 BM25 hits re-ranked)
+	0.004	Caltech theoretical physicist and 2017 Nobel laureate...
+	0.004	Set in a dystopian future where humanity is struggling...
+	0.003	Brothers Christopher and Jonathan Nolan wrote the screenplay...
+```
+
+<Note>
+Reranking uses a cross-encoder model that considers query-document pairs jointly, providing better relevance than bi-encoder retrieval alone.
+</Note>
+
+## Retrieval-Augmented Generation
+
+### Complete RAG Pipeline
+
+```python
+def rag_search_and_generate(query):
+    # 1. Retrieval: Dense search
+    results = search(query, number_of_results=3)
+    
+    # 2. Augment: Prepare context
+    docs_dict = [{'text': text} for text in results['texts']]
+    
+    # 3. Generate: Grounded response
+    response = co.chat(
+        message=query,
+        documents=docs_dict
+    )
+    
+    return response.text
+
+# Example query
+query = "income generated"
+response = rag_search_and_generate(query)
+print(response)
+# Output: "The film generated a worldwide gross of over $677 million, 
+#          or $773 million with subsequent re-releases."
+```
+
+### With Citations
+
+Track which documents were used:
+
+```python
+response = co.chat(
+    message=query,
+    documents=docs_dict
+)
+
+print("Response:", response.text)
+print("\nCitations:")
+for citation in response.citations:
+    print(f"- {citation.text} (from doc {citation.document_ids})")
+```
+
+<CodeGroup>
+```python Cohere
+response = co.chat(
+    message=query,
+    documents=docs_dict
+)
+print(response.text)
+```
+
+```python OpenAI
+from langchain_openai import ChatOpenAI
+from langchain.chains import RetrievalQA
+
+llm = ChatOpenAI(model="gpt-4")
+qa_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    retriever=vectorstore.as_retriever()
+)
+response = qa_chain.run(query)
+```
+
+```python Local LLM
+from langchain_community.llms import LlamaCpp
+
+llm = LlamaCpp(model_path="model.gguf")
+context = "\n".join(results['texts'])
+prompt = f"Context: {context}\n\nQuestion: {query}\nAnswer:"
+response = llm(prompt)
+```
+</CodeGroup>
+
+## Advanced Patterns
+
+### Document Chunking Strategies
+
+<AccordionGroup>
+  <Accordion title="Fixed-Size Chunks">
+    ```python
+    def chunk_text(text, chunk_size=500, overlap=50):
+        chunks = []
+        for i in range(0, len(text), chunk_size - overlap):
+            chunks.append(text[i:i + chunk_size])
+        return chunks
+    ```
+  </Accordion>
+  <Accordion title="Sentence-Based">
+    ```python
+    import nltk
+    nltk.download('punkt')
+    
+    def chunk_by_sentences(text, sentences_per_chunk=3):
+        sentences = nltk.sent_tokenize(text)
+        chunks = []
+        for i in range(0, len(sentences), sentences_per_chunk):
+            chunk = ' '.join(sentences[i:i + sentences_per_chunk])
+            chunks.append(chunk)
+        return chunks
+    ```
+  </Accordion>
+  <Accordion title="Semantic Chunking">
+    ```python
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200,
+        separators=["\n\n", "\n", " ", ""]
+    )
+    chunks = text_splitter.split_text(text)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Vector Databases
+
+<Tabs>
+  <Tab title="FAISS">
+    ```python
+    import faiss
+    
+    # Create index
+    index = faiss.IndexFlatL2(dim)
+    index.add(embeddings)
+    
+    # Search
+    D, I = index.search(query_embedding, k=5)
+    ```
+  </Tab>
+  <Tab title="Pinecone">
+    ```python
+    import pinecone
+    
+    pinecone.init(api_key="YOUR_KEY")
+    index = pinecone.Index("my-index")
+    
+    # Upsert
+    index.upsert(vectors=[("id1", embedding, {"text": text})])
+    
+    # Query
+    results = index.query(query_embedding, top_k=5)
+    ```
+  </Tab>
+  <Tab title="Chroma">
+    ```python
+    import chromadb
+    
+    client = chromadb.Client()
+    collection = client.create_collection("my_collection")
+    
+    # Add documents
+    collection.add(
+        documents=texts,
+        ids=[f"id{i}" for i in range(len(texts))]
+    )
+    
+    # Query
+    results = collection.query(
+        query_texts=[query],
+        n_results=5
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Evaluation Metrics
+
+### Retrieval Quality
+
+```python
+def evaluate_retrieval(queries, relevant_docs, retrieved_docs):
+    """
+    queries: List of query strings
+    relevant_docs: List of lists (ground truth relevant doc IDs per query)
+    retrieved_docs: List of lists (retrieved doc IDs per query)
+    """
+    from sklearn.metrics import ndcg_score
+    
+    # Precision@k
+    def precision_at_k(relevant, retrieved, k):
+        retrieved_k = retrieved[:k]
+        relevant_retrieved = len(set(relevant) & set(retrieved_k))
+        return relevant_retrieved / k
+    
+    # Recall@k
+    def recall_at_k(relevant, retrieved, k):
+        retrieved_k = retrieved[:k]
+        relevant_retrieved = len(set(relevant) & set(retrieved_k))
+        return relevant_retrieved / len(relevant)
+    
+    # Calculate metrics
+    k = 5
+    precision_scores = []
+    recall_scores = []
+    
+    for relevant, retrieved in zip(relevant_docs, retrieved_docs):
+        precision_scores.append(precision_at_k(relevant, retrieved, k))
+        recall_scores.append(recall_at_k(relevant, retrieved, k))
+    
+    print(f"Precision@{k}: {np.mean(precision_scores):.3f}")
+    print(f"Recall@{k}: {np.mean(recall_scores):.3f}")
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Chunking">
+    - Keep chunks between 100-500 tokens
+    - Use overlap (10-20%) to preserve context
+    - Maintain semantic boundaries (paragraphs, sentences)
+    - Include metadata (source, date, section)
+  </Accordion>
+  <Accordion title="Embeddings">
+    - Use domain-specific models when available
+    - Normalize embeddings for cosine similarity
+    - Batch embed for efficiency
+    - Cache embeddings to avoid recomputation
+  </Accordion>
+  <Accordion title="Retrieval">
+    - Start with hybrid search (BM25 + dense)
+    - Use reranking for top candidates
+    - Retrieve more documents than needed (10-20) then rerank to top 3-5
+    - Filter by metadata when possible
+  </Accordion>
+  <Accordion title="Generation">
+    - Cite sources in responses
+    - Handle cases with no relevant documents
+    - Use temperature=0 for factual tasks
+    - Validate against retrieved context
+  </Accordion>
+</AccordionGroup>
+
+## Common Pitfalls
+
+<Warning>
+**Chunk Size Mismatch**: Too large chunks dilute relevance; too small chunks lose context. Experiment with your data!
+</Warning>
+
+<Warning>
+**Ignoring Metadata**: Use document metadata (date, source, section) to filter and improve retrieval quality.
+</Warning>
+
+<Warning>
+**No Fallback**: Always handle cases where no relevant documents are found. Don't generate unsupported answers.
+</Warning>
+
+<Warning>
+**Dense-Only Search**: Hybrid search (BM25 + dense) often outperforms either method alone.
+</Warning>
+
+## Try It Yourself
+
+<Card title="Interactive Notebook" icon="flask" href="https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter08/Chapter%208%20-%20Semantic%20Search.ipynb">
+  Build complete RAG systems with this hands-on Colab notebook from Chapter 8.
+</Card>
+
+## Related Techniques
+
+<CardGroup cols={3}>
+  <Card title="Prompt Engineering" icon="wand-magic-sparkles" href="/advanced/prompt-engineering">
+    Optimize prompts for retrieval
+  </Card>
+  <Card title="Text Generation" icon="link" href="/advanced/text-generation">
+    Advanced generation patterns
+  </Card>
+  <Card title="Multimodal LLMs" icon="images" href="/advanced/multimodal-llms">
+    Visual search and retrieval
+  </Card>
+</CardGroup>

@@ -1,0 +1,162 @@
+---
+title: A Visual Guide to Quantization
+description: Deep dive into quantization techniques for reducing model size and computational requirements
+---
+
+Quantization is a powerful technique for making large language models more efficient and accessible. While the book introduces quantization concepts in Chapters 7 and 12, this visual guide explores the technical intricacies in much greater depth.
+
+<Card
+  title="A Visual Guide to Quantization"
+  icon="compress"
+  href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-quantization"
+>
+  Read the full illustrated guide on quantization techniques
+</Card>
+
+## Why Quantization Matters
+
+As language models grow larger, running them becomes increasingly expensive and resource-intensive. Quantization addresses this by reducing the precision of model weights and activations, allowing you to:
+
+- **Reduce memory footprint** by 2-8x or more
+- **Speed up inference** on consumer hardware
+- **Lower deployment costs** significantly
+- **Run larger models** on devices with limited resources
+
+<Note>
+  Modern quantization techniques can reduce models to 4-bit or even lower precision while maintaining most of their performance.
+</Note>
+
+## What You'll Learn
+
+This visual guide covers a comprehensive range of quantization methods:
+
+<CardGroup cols={2}>
+  <Card title="Fundamentals" icon="book-open">
+    - Number representation basics
+    - Precision vs. performance tradeoffs
+    - INT8, INT4, and lower bit representations
+    - Quantization awareness
+  </Card>
+  
+  <Card title="Advanced Techniques" icon="microchip">
+    - Post-training quantization (PTQ)
+    - Quantization-aware training (QAT)
+    - BitNet and ternary parameters
+    - Mixed-precision quantization
+  </Card>
+</CardGroup>
+
+## Key Concepts Explored
+
+### Post-Training Quantization (PTQ)
+
+Learn how to quantize already-trained models without additional training. PTQ is the most practical approach for most use cases:
+
+- Convert existing model weights to lower precision
+- Minimal impact on model quality when done correctly
+- Fast and easy to apply
+- Works well with calibration datasets
+
+### Quantization-Aware Training (QAT)
+
+Understand how to train models with quantization in mind:
+
+- Simulate quantization during training
+- Model learns to be robust to reduced precision
+- Better performance than PTQ at very low bit-widths
+- Higher training cost but better final results
+
+### INT8 Quantization
+
+The guide provides detailed visualizations of how 32-bit floating-point weights are converted to 8-bit integers:
+
+- Mapping floating-point ranges to integer ranges
+- Scale and zero-point calculations
+- Maintaining numerical accuracy
+- Hardware acceleration benefits
+
+<Info>
+  INT8 quantization typically reduces model size by 4x while maintaining 99%+ of the original model's performance.
+</Info>
+
+### BitNet: Extreme Quantization
+
+Explore cutting-edge research in extreme quantization:
+
+- **Ternary parameters**: Reducing weights to just 3 possible values (-1, 0, +1)
+- Massive compression ratios
+- Specialized hardware opportunities
+- The future of efficient model deployment
+
+## Quantization in Practice
+
+The guide illustrates practical considerations:
+
+- Which layers to quantize (and which to keep in full precision)
+- Calibration dataset selection
+- Evaluating quantized model quality
+- Hardware-specific optimizations
+
+### Mixed-Precision Strategies
+
+Not all model components need the same precision:
+
+- Keep attention weights in higher precision
+- Quantize large feedforward layers more aggressively
+- Balance memory savings with quality degradation
+- Layer-specific quantization strategies
+
+## Visual Highlights
+
+The guide features detailed illustrations showing:
+
+- How floating-point numbers map to quantized integers
+- The impact of different bit-widths on model quality
+- BitNet's ternary parameter representation
+- Quantization-aware training workflows
+
+<Note>
+  The visual style matches the book perfectly, making it easy to follow even complex mathematical concepts through intuitive diagrams.
+</Note>
+
+## How This Extends the Book
+
+**Chapter 7** introduces quantization as a technique for efficient deployment. **Chapter 12** covers it in the context of fine-tuning and training. This guide builds upon that foundation by:
+
+- Providing **deeper mathematical insights** into how quantization works
+- Exploring **cutting-edge methods** like BitNet
+- Showing **practical implementation details**
+- Comparing different quantization approaches
+
+## Prerequisites
+
+Before diving into this guide, you should have:
+
+- Read **Chapter 7** (Prompt Engineering and Structured Output)
+- Read **Chapter 12** (Training and Fine-Tuning)
+- Understanding of model parameters and weights
+- Basic knowledge of number representation (floating-point, integer)
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Chapter 7: Efficient Deployment" icon="book" href="/advanced/prompt-engineering">
+    Learn about deployment optimization techniques
+  </Card>
+  
+  <Card title="Chapter 12: Training" icon="book" href="/development/fine-tuning-generation">
+    Understand model training and fine-tuning
+  </Card>
+  
+  <Card title="Mixture of Experts" icon="brain" href="/bonus/mixture-of-experts">
+    Explore another efficiency technique through MoE
+  </Card>
+  
+  <Card title="Reasoning LLMs" icon="lightbulb" href="/bonus/reasoning-llms">
+    Learn about test-time compute tradeoffs
+  </Card>
+</CardGroup>
+
+<Info>
+  Quantization is one of the most practical techniques for deploying LLMs in production. This guide gives you the deep understanding needed to apply it effectively.
+</Info>

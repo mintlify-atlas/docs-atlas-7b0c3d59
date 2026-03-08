@@ -1,0 +1,257 @@
+---
+title: 'Introduction to Language Models'
+description: 'Exploring the exciting field of Language AI and how to get started with large language models'
+icon: 'brain'
+---
+
+## Overview
+
+Welcome to the world of Large Language Models (LLMs)! This chapter introduces you to the fundamental concepts behind language models and shows you how to download and run your first LLM. You'll learn how modern language models like GPT, Phi-3, and others can understand and generate human-like text.
+
+<Note>
+This chapter corresponds to **Chapter 1** of the Hands-On Large Language Models book. The complete code examples are available in the [GitHub repository](https://github.com/HandsOnLLM/Hands-On-Large-Language-Models).
+</Note>
+
+## What You'll Learn
+
+By the end of this chapter, you'll understand:
+
+<Steps>
+  <Step title="What Language Models Are">
+    Learn the core concepts behind how language models predict and generate text
+  </Step>
+  <Step title="How to Load Pre-trained Models">
+    Download and initialize models using the Hugging Face Transformers library
+  </Step>
+  <Step title="Running Your First LLM">
+    Generate text with a state-of-the-art language model
+  </Step>
+  <Step title="Understanding Model Components">
+    Explore the key components: models, tokenizers, and pipelines
+  </Step>
+</Steps>
+
+## Setting Up Your Environment
+
+Before running language models, you'll need to install the required dependencies. We recommend using Google Colab with a T4 GPU for the best experience.
+
+<Tabs>
+  <Tab title="Google Colab">
+    In Google Colab, go to **Runtime > Change runtime type > Hardware accelerator > GPU > GPU type > T4**
+    
+    ```bash
+    pip install transformers==4.41.2 accelerate==0.31.0
+    ```
+  </Tab>
+  <Tab title="Local Setup">
+    ```bash
+    pip install transformers==4.41.2 accelerate==0.31.0
+    ```
+    
+    Make sure you have a CUDA-compatible GPU for faster inference.
+  </Tab>
+</Tabs>
+
+## Loading Your First Language Model
+
+Let's start by loading Microsoft's Phi-3, a powerful yet compact language model that can run on consumer hardware.
+
+### Step 1: Load the Model and Tokenizer
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Load model and tokenizer
+model = AutoModelForCausalLM.from_pretrained(
+    "microsoft/Phi-3-mini-4k-instruct",
+    device_map="cuda",
+    torch_dtype="auto",
+    trust_remote_code=False,
+)
+tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+```
+
+<Note>
+The `AutoModelForCausalLM` and `AutoTokenizer` classes automatically detect and load the appropriate model architecture. The `device_map="cuda"` parameter ensures the model runs on your GPU for faster inference.
+</Note>
+
+### Step 2: Create a Pipeline
+
+While you can use the model and tokenizer directly, wrapping them in a pipeline simplifies text generation:
+
+```python
+from transformers import pipeline
+
+# Create a pipeline
+generator = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer,
+    return_full_text=False,
+    max_new_tokens=500,
+    do_sample=False
+)
+```
+
+<Tip>
+The `pipeline` abstraction handles tokenization, generation, and decoding automatically, making it the easiest way to work with LLMs.
+</Tip>
+
+### Step 3: Generate Text
+
+Now you're ready to generate your first text with an LLM:
+
+```python
+# The prompt (user input / query)
+messages = [
+    {"role": "user", "content": "Create a funny joke about chickens."}
+]
+
+# Generate output
+output = generator(messages)
+print(output[0]["generated_text"])
+```
+
+**Output:**
+```
+Why did the chicken join the band? Because it had the drumsticks!
+```
+
+## Understanding the Components
+
+Language models consist of three main components:
+
+<CardGroup cols={3}>
+  <Card title="Model" icon="microchip">
+    The neural network that processes text and generates predictions. Contains billions of parameters trained on vast amounts of text data.
+  </Card>
+  <Card title="Tokenizer" icon="scissors">
+    Breaks text into smaller units (tokens) that the model can process. Each token is mapped to a unique ID.
+  </Card>
+  <Card title="Pipeline" icon="pipe">
+    A high-level abstraction that combines the model and tokenizer, handling the entire generation workflow.
+  </Card>
+</CardGroup>
+
+## How Language Models Generate Text
+
+Language models generate text through an autoregressive process:
+
+1. **Tokenization**: Input text is converted into token IDs
+2. **Processing**: The model processes these tokens through its neural network
+3. **Prediction**: For each position, the model outputs probabilities for the next token
+4. **Sampling**: A token is selected from the probability distribution
+5. **Iteration**: The selected token is added to the input, and the process repeats
+
+This iterative process continues until a stopping condition is met (like reaching `max_new_tokens` or generating an end-of-sequence token).
+
+## Key Concepts
+
+<AccordionGroup>
+  <Accordion title="Causal Language Models">
+    Causal (or autoregressive) language models generate text by predicting one token at a time, conditioned on all previous tokens. This is the architecture used by GPT, Phi-3, LLaMA, and most modern generative models.
+  </Accordion>
+  
+  <Accordion title="Pre-trained Models">
+    Pre-trained models have been trained on massive text datasets (often hundreds of billions of tokens) to learn language patterns, facts, and reasoning abilities. You can use these models directly or fine-tune them for specific tasks.
+  </Accordion>
+  
+  <Accordion title="Instruction-Tuned Models">
+    Models like Phi-3-mini-4k-instruct have been fine-tuned to follow instructions better. They're trained on conversational data and formatted prompts, making them more suitable for chat and task-completion applications.
+  </Accordion>
+  
+  <Accordion title="Model Size vs Performance">
+    Larger models (with more parameters) generally perform better but require more computational resources. Phi-3-mini has 3.8 billion parameters, while GPT-4 has over 1 trillion. The choice depends on your use case and available hardware.
+  </Accordion>
+</AccordionGroup>
+
+## Practical Considerations
+
+### Hardware Requirements
+
+- **GPU Memory**: Phi-3-mini requires ~8GB of VRAM
+- **CPU Alternative**: Models can run on CPU but will be significantly slower
+- **Cloud Options**: Google Colab offers free T4 GPUs (16GB VRAM)
+
+### Generation Parameters
+
+Key parameters that control text generation:
+
+```python
+generator = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer,
+    return_full_text=False,    # Don't include the prompt in output
+    max_new_tokens=500,         # Maximum tokens to generate
+    do_sample=False             # Use greedy decoding (deterministic)
+)
+```
+
+<Warning>
+Setting `do_sample=False` uses greedy decoding (always picks the most likely token), resulting in deterministic but sometimes repetitive output. We'll explore sampling strategies in later chapters.
+</Warning>
+
+## Try It Yourself
+
+Experiment with different prompts and observe how the model responds:
+
+<CodeGroup>
+```python Instruction Following
+messages = [
+    {"role": "user", "content": "Explain quantum computing in simple terms."}
+]
+output = generator(messages)
+print(output[0]["generated_text"])
+```
+
+```python Creative Writing
+messages = [
+    {"role": "user", "content": "Write a short story about a robot learning to paint."}
+]
+output = generator(messages)
+print(output[0]["generated_text"])
+```
+
+```python Code Generation
+messages = [
+    {"role": "user", "content": "Write a Python function to calculate the Fibonacci sequence."}
+]
+output = generator(messages)
+print(output[0]["generated_text"])
+```
+</CodeGroup>
+
+## Run the Full Notebook
+
+Explore the complete chapter with additional examples and experiments:
+
+<Card title="Chapter 1 Notebook" icon="rocket" href="https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter01/Chapter%201%20-%20Introduction%20to%20Language%20Models.ipynb">
+  Open in Google Colab to run all examples interactively
+</Card>
+
+## Next Steps
+
+Now that you've successfully loaded and run your first language model, you're ready to dive deeper into how these models work under the hood:
+
+<CardGroup cols={2}>
+  <Card title="Tokens and Embeddings" icon="language" href="/fundamentals/tokens-embeddings">
+    Learn how text is converted into numbers that models can process
+  </Card>
+  <Card title="Transformer Architecture" icon="sitemap" href="/fundamentals/transformer-architecture">
+    Explore the neural network architecture that powers modern LLMs
+  </Card>
+</CardGroup>
+
+## Key Takeaways
+
+<Check>Successfully loaded and ran a pre-trained language model</Check>
+<Check>Understood the three main components: model, tokenizer, and pipeline</Check>
+<Check>Generated text using different prompts and instructions</Check>
+<Check>Learned about autoregressive text generation</Check>
+
+---
+
+<Tip>
+**What's Next?** In the next chapter, we'll open up the "black box" and explore how text is converted into tokens and embeddings—the fundamental representation that makes language models possible.
+</Tip>

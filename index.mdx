@@ -1,97 +1,127 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Hands-On Large Language Models"
+description: "Learn practical LLM concepts through visual education and hands-on code examples from the official O'Reilly book repository"
 ---
 
-## Setting up
+<div className="bg-[#e6edf2] rounded border border-black/10 p-8 mb-8">
+  <h1 className="text-5xl font-bold mb-4" style={{ color: '#db3939' }}>
+    Hands-On Large Language Models
+  </h1>
+  <p className="text-xl mb-6" style={{ color: '#000000' }}>
+    The official code repository for the O'Reilly book — learn practical LLM concepts through visual education and hands-on examples
+  </p>
+  <div className="flex gap-4">
+    <a 
+      href="/quickstart" 
+      className="px-6 py-3 rounded border-2 font-semibold transition-colors"
+      style={{ 
+        backgroundColor: 'transparent', 
+        color: '#1a1a1a', 
+        borderColor: '#db3939',
+        borderRadius: '4px'
+      }}
+    >
+      Get Started
+    </a>
+    <a 
+      href="https://github.com/HandsOnLLM/Hands-On-Large-Language-Models" 
+      className="px-6 py-3 rounded border-2 font-semibold transition-colors"
+      style={{ 
+        backgroundColor: 'transparent', 
+        color: '#1a1a1a', 
+        borderColor: '#000000',
+        borderRadius: '4px'
+      }}
+    >
+      View on GitHub
+    </a>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+## Learn by Doing
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+Master large language models through 12 comprehensive chapters combining theory with practical implementation.
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Visual Education" icon="chart-simple" href="/fundamentals/language-models">
+    300+ custom illustrations make complex LLM concepts intuitive and accessible
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Hands-On Code" icon="code" href="/quickstart">
+    Run all examples in Google Colab with free T4 GPU — no local setup required
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="End-to-End Coverage" icon="book-open" href="/introduction">
+    From fundamentals to fine-tuning: everything you need to build with LLMs
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Industry Relevant" icon="briefcase" href="/advanced/semantic-search-rag">
+    Learn RAG, prompt engineering, and production techniques used in real applications
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## What You'll Master
 
-Everything you need to create world-class documentation.
+<Steps>
+  <Step title="Fundamentals">
+    Understand how language models work, from tokenization to transformer architecture internals
+  </Step>
+  <Step title="Core Applications">
+    Implement text classification, clustering, and topic modeling with state-of-the-art models
+  </Step>
+  <Step title="Advanced Techniques">
+    Master prompt engineering, semantic search, RAG, and multimodal LLMs
+  </Step>
+  <Step title="Model Development">
+    Create custom embedding models and fine-tune both representation and generation models
+  </Step>
+</Steps>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Quick Navigation
 
-## Need inspiration?
+<CardGroup cols={3}>
+  <Card title="Fundamentals" icon="brain" href="/fundamentals/language-models">
+    Language models, tokens, embeddings, and transformer architecture
+  </Card>
+  <Card title="Applications" icon="sparkles" href="/applications/text-classification">
+    Text classification and clustering with modern LLMs
+  </Card>
+  <Card title="Prompt Engineering" icon="wand-magic-sparkles" href="/advanced/prompt-engineering">
+    Techniques for getting the best results from LLMs
+  </Card>
+  <Card title="Semantic Search & RAG" icon="magnifying-glass" href="/advanced/semantic-search-rag">
+    Build retrieval-augmented generation systems
+  </Card>
+  <Card title="Multimodal LLMs" icon="images" href="/advanced/multimodal-llms">
+    Work with vision-language models
+  </Card>
+  <Card title="Fine-Tuning" icon="screwdriver-wrench" href="/development/fine-tuning-generation">
+    Customize models for your specific use case
+  </Card>
+</CardGroup>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+## Book Features
+
+<Accordion title="12 Comprehensive Chapters">
+  - **Fundamentals**: Introduction, tokens & embeddings, transformer architecture
+  - **Applications**: Text classification, clustering & topic modeling
+  - **Advanced**: Prompt engineering, text generation, semantic search & RAG, multimodal LLMs
+  - **Development**: Creating embeddings, fine-tuning classification & generation models
+</Accordion>
+
+<Accordion title="Hands-On Code Examples">
+  All examples are provided as Jupyter notebooks that run on Google Colab with free GPU access. Every chapter includes working code you can run immediately.
+</Accordion>
+
+<Accordion title="Visual Learning Approach">
+  Almost 300 custom illustrations help you understand complex concepts intuitively. See how attention mechanisms, embeddings, and model architectures actually work.
+</Accordion>
+
+<Accordion title="Bonus Advanced Topics">
+  Continue learning with in-depth guides on quantization, Mamba state space models, mixture of experts, stable diffusion, reasoning LLMs, DeepSeek-R1, and LLM agents.
+</Accordion>
+
+## Get the Book
+
+The book is available on [Amazon](https://www.amazon.com/Hands-Large-Language-Models-Understanding/dp/1098150961), [O'Reilly](https://www.oreilly.com/library/view/hands-on-large-language/9781098150952/), [Kindle](https://www.amazon.com/Hands-Large-Language-Models-Alammar-ebook/dp/B0DGZ46G88), and [other retailers](https://www.goodreads.com/book/show/210408850-hands-on-large-language-models).
+
+<Note>
+  All code examples in this documentation are tested and maintained. They work with Google Colab's free T4 GPU (16GB VRAM).
+</Note>

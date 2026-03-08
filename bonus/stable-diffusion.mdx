@@ -1,0 +1,216 @@
+---
+title: The Illustrated Stable Diffusion
+description: Explore how CLIP enables text-to-image generation through diffusion models
+---
+
+While the book focuses on generating text, the same underlying technologies can be adapted for image generation. Stable Diffusion demonstrates how models like CLIP can bridge language and vision to create stunning images from text descriptions.
+
+<Card
+  title="The Illustrated Stable Diffusion"
+  icon="image"
+  href="https://jalammar.github.io/illustrated-stable-diffusion/"
+>
+  Read Jay Alammar's comprehensive visual guide to Stable Diffusion
+</Card>
+
+## Why Image Generation Matters
+
+Text generation and image generation share fundamental principles:
+
+- **Latent representations**: Both work in learned embedding spaces
+- **Transformer architectures**: Core building blocks apply to both modalities
+- **Conditioning**: Using text to guide generation
+- **Iterative refinement**: Gradually improving outputs
+
+Understanding how these principles extend to images deepens your grasp of generative AI as a whole.
+
+<Note>
+  Stable Diffusion uses CLIP (covered in Chapter 9) to understand text prompts and guide image generation.
+</Note>
+
+## What You'll Learn
+
+This illustrated guide provides a comprehensive walkthrough of Stable Diffusion:
+
+<CardGroup cols={2}>
+  <Card title="Core Components" icon="cube">
+    - CLIP text encoder
+    - Variational autoencoder (VAE)
+    - U-Net diffusion model
+    - Denoising process
+  </Card>
+  
+  <Card title="Generation Process" icon="wand-magic-sparkles">
+    - Text embedding
+    - Noise scheduling
+    - Iterative denoising
+    - Latent decoding
+  </Card>
+</CardGroup>
+
+## Key Concepts Explored
+
+### CLIP's Role in Stable Diffusion
+
+**Chapter 9** introduces CLIP as a way to bring images to text models (for vision-language understanding). Stable Diffusion uses CLIP in the opposite direction:
+
+- **Text encoding**: CLIP converts your prompt into an embedding
+- **Cross-attention**: The diffusion model attends to text embeddings
+- **Semantic guidance**: Text embeddings steer the image generation
+- **Conditioning signal**: Same joint embedding space from Chapter 9
+
+<Info>
+  CLIP's shared text-image embedding space is what makes text-to-image generation possible. The model learns to generate images whose CLIP embeddings align with the text prompt.
+</Info>
+
+### The Variational Autoencoder (VAE)
+
+Understand how Stable Diffusion works in a compressed latent space:
+
+- **Encoder**: Compresses images into lower-dimensional latents
+- **Latent space**: Where the actual diffusion happens (much faster!)
+- **Decoder**: Converts latents back to full-resolution images
+- **Efficiency**: Working in latent space is 64x faster than pixel space
+
+### The Diffusion Process
+
+The guide illustrates how diffusion models work:
+
+1. **Start with noise**: Begin with random latent noise
+2. **Iterative denoising**: Gradually remove noise over many steps
+3. **Text conditioning**: Use CLIP embeddings to guide denoising
+4. **Noise prediction**: Model predicts what noise to remove
+5. **Final image**: Decode the denoised latent to pixels
+
+<Note>
+  Diffusion models are trained to reverse a noise-adding process. During generation, they start with noise and iteratively denoise to create coherent images.
+</Note>
+
+### The U-Net Architecture
+
+The core of Stable Diffusion:
+
+- **Encoder path**: Progressively downsamples the latent
+- **Bottleneck**: Processes the most compressed representation
+- **Decoder path**: Progressively upsamples back to full latent size
+- **Skip connections**: Preserve fine-grained details
+- **Cross-attention layers**: Incorporate text conditioning
+
+## How Text Controls Images
+
+The guide provides detailed visualizations of:
+
+### Cross-Attention Mechanism
+- Image features (queries) attend to text embeddings (keys/values)
+- Different image regions focus on different parts of the prompt
+- Multiple attention heads capture various text-image relationships
+- Learned alignment between language and visual concepts
+
+### Conditioning Strength
+- Classifier-free guidance: Balancing prompt adherence vs. image quality
+- Guidance scale parameter: How strongly to follow the prompt
+- Tradeoffs between creativity and accuracy
+
+## The Complete Pipeline
+
+The illustrated guide walks through the full generation process:
+
+1. **Text Prompt** → CLIP Text Encoder → Text Embeddings
+2. **Random Noise** → Latent Space
+3. **U-Net Diffusion** (with text cross-attention) → Denoised Latents (repeated ~50 times)
+4. **VAE Decoder** → Final Image
+
+<CardGroup cols={2}>
+  <Card title="Input" icon="keyboard">
+    "A photo of a cat wearing sunglasses"
+  </Card>
+  
+  <Card title="Output" icon="image">
+    High-quality image matching the description
+  </Card>
+</CardGroup>
+
+## Advanced Techniques
+
+The guide also covers:
+
+- **Negative prompts**: Steering away from unwanted features
+- **Image-to-image**: Starting from an existing image instead of noise
+- **Inpainting**: Modifying specific regions of an image
+- **ControlNet**: Adding geometric guidance (edges, pose, etc.)
+
+## Diffusion vs. Autoregressive Generation
+
+Comparing image and text generation:
+
+| Aspect | Text (Autoregressive) | Images (Diffusion) |
+|--------|----------------------|--------------------|
+| **Process** | Sequential token generation | Parallel iterative refinement |
+| **Steps** | One token at a time | Multiple denoising steps |
+| **Reversibility** | One-way (can't un-generate) | Can add noise back |
+| **Editing** | Difficult to modify | Natural image editing |
+
+## Visual Highlights
+
+The guide features comprehensive illustrations of:
+
+- The complete Stable Diffusion architecture
+- How CLIP text encoding works
+- The VAE compression and decompression process
+- Step-by-step denoising visualization
+- Cross-attention between text and image features
+
+<Info>
+  Jay Alammar's visual style is similar to the book's approach, making this guide feel like a natural extension of Chapter 9.
+</Info>
+
+## How This Extends the Book
+
+**Chapter 9** covers:
+- Vision Transformers (ViT)
+- CLIP for image-text understanding
+- Bringing images to language models
+
+This guide extends those concepts by:
+
+- Showing CLIP used in the **opposite direction** (text → images)
+- Introducing **diffusion models** as an alternative to autoregressive generation
+- Demonstrating **latent space manipulation**
+- Exploring **cross-modal conditioning** in depth
+
+<Note>
+  Understanding both directions (text→image and image→text) gives you a complete picture of multimodal AI.
+</Note>
+
+## Prerequisites
+
+Before exploring this guide, you should have:
+
+- Read **Chapter 9** (Multimodal Models and CLIP)
+- Understanding of embeddings and latent spaces
+- Familiarity with attention mechanisms (from Chapter 3)
+- Basic knowledge of autoencoders (helpful but not required)
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Chapter 9: CLIP" icon="book" href="/advanced/multimodal-llms">
+    Learn how CLIP creates shared text-image embeddings
+  </Card>
+  
+  <Card title="Chapter 3: Attention" icon="book" href="/fundamentals/transformer-architecture">
+    Understand attention mechanisms used in U-Net
+  </Card>
+  
+  <Card title="Text Embeddings" icon="font" href="/fundamentals/tokens-embeddings">
+    Foundation for understanding latent spaces
+  </Card>
+  
+  <Card title="LLM Agents" icon="users" href="/bonus/llm-agents">
+    Agents that combine text and image generation
+  </Card>
+</CardGroup>
+
+<Info>
+  Stable Diffusion demonstrates that the transformers and embeddings you learned about for text apply equally well to images and other modalities.
+</Info>

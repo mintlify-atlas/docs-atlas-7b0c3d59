@@ -1,0 +1,479 @@
+---
+title: Creating Text Embedding Models
+description: Learn how to train and fine-tune embedding models using contrastive learning techniques
+icon: vector-square
+---
+
+## Overview
+
+Text embedding models transform text into dense vector representations that capture semantic meaning. This chapter explores methods for both training embedding models from scratch and fine-tuning existing models using the sentence-transformers library.
+
+<Note>
+Embedding models are essential for semantic search, clustering, classification, and retrieval tasks. Quality embeddings can significantly improve downstream task performance.
+</Note>
+
+## When to Use This Technique
+
+Consider training or fine-tuning embedding models when:
+
+- **Domain-Specific Requirements**: Your data comes from a specialized domain (legal, medical, technical)
+- **Improved Retrieval**: You need better semantic search results for your specific use case
+- **Task Optimization**: You want embeddings optimized for your particular task (classification, clustering, retrieval)
+- **Language Coverage**: You need embeddings for low-resource languages or mixed-language scenarios
+
+## GPU Requirements
+
+<Warning>
+**Minimum Requirements**: T4 GPU with 16GB VRAM for training base models
+
+- Training from scratch: 1-2 hours on T4 GPU
+- Fine-tuning existing models: 10-30 minutes on T4 GPU
+- Batch size: 32 (adjust based on available VRAM)
+</Warning>
+
+## Dataset Preparation
+
+The choice of dataset format depends on your loss function:
+
+### For Classification (SoftmaxLoss)
+
+```python
+from datasets import load_dataset
+
+# Load MNLI dataset (premise, hypothesis, label)
+train_dataset = load_dataset("glue", "mnli", split="train").select(range(50_000))
+train_dataset = train_dataset.remove_columns("idx")
+
+# Example structure:
+# {
+#   'premise': 'One of our number will carry out your instructions minutely.',
+#   'hypothesis': 'A member of my team will execute your orders with precision.',
+#   'label': 0  # 0=entailment, 1=neutral, 2=contradiction
+# }
+```
+
+### For Similarity (CosineSimilarityLoss)
+
+```python
+from datasets import Dataset
+
+# Convert labels to similarity scores
+mapping = {2: 0, 1: 0, 0: 1}  # contradiction/neutral=0, entailment=1
+train_dataset = Dataset.from_dict({
+    "sentence1": train_dataset["premise"],
+    "sentence2": train_dataset["hypothesis"],
+    "label": [float(mapping[label]) for label in train_dataset["label"]]
+})
+```
+
+### For Retrieval (MultipleNegativesRankingLoss)
+
+```python
+import random
+from tqdm import tqdm
+
+# Prepare anchor-positive-negative triplets
+train_dataset = {"anchor": [], "positive": [], "negative": []}
+soft_negatives = mnli["hypothesis"]
+random.shuffle(soft_negatives)
+
+for row, soft_negative in tqdm(zip(mnli, soft_negatives)):
+    train_dataset["anchor"].append(row["premise"])
+    train_dataset["positive"].append(row["hypothesis"])
+    train_dataset["negative"].append(soft_negative)
+
+train_dataset = Dataset.from_dict(train_dataset)
+```
+
+## Training Embedding Models
+
+<Steps>
+
+<Step title="Load Base Model">
+
+Start with a pre-trained transformer model:
+
+```python
+from sentence_transformers import SentenceTransformer
+
+# Use a base model (BERT, RoBERTa, etc.)
+embedding_model = SentenceTransformer('bert-base-uncased')
+```
+
+</Step>
+
+<Step title="Choose Loss Function">
+
+Select the appropriate loss function for your task:
+
+<Tabs>
+<Tab title="SoftmaxLoss">
+
+```python
+from sentence_transformers import losses
+
+# For classification tasks with labeled pairs
+train_loss = losses.SoftmaxLoss(
+    model=embedding_model,
+    sentence_embedding_dimension=embedding_model.get_sentence_embedding_dimension(),
+    num_labels=3  # Number of classes
+)
+```
+
+**When to use**: Classification tasks with discrete labels (entailment, sentiment, categories)
+
+**Training loss**: Starts at ~1.08, decreases to ~0.77
+
+</Tab>
+
+<Tab title="CosineSimilarityLoss">
+
+```python
+from sentence_transformers import losses
+
+# For regression tasks with similarity scores
+train_loss = losses.CosineSimilarityLoss(model=embedding_model)
+```
+
+**When to use**: Tasks with continuous similarity scores (semantic textual similarity)
+
+**Training loss**: Starts at ~0.23, decreases to ~0.14
+
+</Tab>
+
+<Tab title="MultipleNegativesRankingLoss">
+
+```python
+from sentence_transformers import losses
+
+# For retrieval and ranking tasks
+train_loss = losses.MultipleNegativesRankingLoss(model=embedding_model)
+```
+
+**When to use**: Retrieval, semantic search, and ranking tasks
+
+**Training loss**: Starts at ~0.34, decreases to ~0.06
+
+**Best performance**: Achieves highest correlation (0.82+) on evaluation
+
+</Tab>
+</Tabs>
+
+</Step>
+
+<Step title="Configure Training Arguments">
+
+```python
+from sentence_transformers.training_args import SentenceTransformerTrainingArguments
+
+args = SentenceTransformerTrainingArguments(
+    output_dir="base_embedding_model",
+    num_train_epochs=1,
+    per_device_train_batch_size=32,
+    per_device_eval_batch_size=32,
+    warmup_steps=100,
+    fp16=True,  # Use mixed precision training
+    eval_steps=100,
+    logging_steps=100,
+)
+```
+
+**Key Hyperparameters**:
+
+| Parameter | Value | Effect |
+|-----------|-------|--------|
+| `per_device_train_batch_size` | 32 | Higher = faster training but more VRAM |
+| `warmup_steps` | 100 | Gradual learning rate increase |
+| `fp16` | True | 2x faster, 50% less memory |
+| `num_train_epochs` | 1 | More epochs = better fit, risk overfitting |
+
+</Step>
+
+<Step title="Train the Model">
+
+```python
+from sentence_transformers.trainer import SentenceTransformerTrainer
+from sentence_transformers.evaluation import EmbeddingSimilarityEvaluator
+
+# Create evaluator
+val_sts = load_dataset('glue', 'stsb', split='validation')
+evaluator = EmbeddingSimilarityEvaluator(
+    sentences1=val_sts["sentence1"],
+    sentences2=val_sts["sentence2"],
+    scores=[score/5 for score in val_sts["label"]],
+    main_similarity="cosine"
+)
+
+# Train
+trainer = SentenceTransformerTrainer(
+    model=embedding_model,
+    args=args,
+    train_dataset=train_dataset,
+    loss=train_loss,
+    evaluator=evaluator
+)
+trainer.train()
+```
+
+**Expected Training Time**: ~6 minutes per epoch (50K samples, batch size 32)
+
+</Step>
+
+</Steps>
+
+## Fine-Tuning Pre-Trained Embeddings
+
+Fine-tuning existing embeddings is faster and often produces better results:
+
+```python
+from sentence_transformers import SentenceTransformer, losses
+from sentence_transformers.trainer import SentenceTransformerTrainer
+
+# Load pre-trained model
+embedding_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+
+# Use MultipleNegativesRankingLoss for best results
+train_loss = losses.MultipleNegativesRankingLoss(model=embedding_model)
+
+# Training arguments (same as before)
+args = SentenceTransformerTrainingArguments(
+    output_dir="finetuned_embedding_model",
+    num_train_epochs=1,
+    per_device_train_batch_size=32,
+    warmup_steps=100,
+    fp16=True,
+    eval_steps=100,
+    logging_steps=100,
+)
+
+# Train
+trainer = SentenceTransformerTrainer(
+    model=embedding_model,
+    args=args,
+    train_dataset=train_dataset,
+    loss=train_loss,
+    evaluator=evaluator
+)
+trainer.train()
+```
+
+**Performance Comparison**:
+
+| Model | Spearman Correlation | Training Time |
+|-------|---------------------|---------------|
+| Original all-MiniLM-L6-v2 | 0.867 | - |
+| Fine-tuned (MNRL) | 0.848 | ~2 minutes |
+| Trained from scratch (BERT) | 0.816 | ~6 minutes |
+
+<Tip>
+Fine-tuning a pre-trained model typically achieves 95-98% of training from scratch performance in 1/3 the time.
+</Tip>
+
+## Evaluation and Validation
+
+### Using MTEB Benchmark
+
+```python
+from mteb import MTEB
+
+# Choose evaluation task
+evaluation = MTEB(tasks=["Banking77Classification"])
+
+# Calculate results
+results = evaluation.run(embedding_model)
+print(results)
+
+# Output:
+# {
+#   'Banking77Classification': {
+#     'test': {
+#       'accuracy': 0.460,
+#       'f1': 0.458
+#     }
+#   }
+# }
+```
+
+### Custom Evaluation
+
+```python
+# Evaluate on your own dataset
+results = evaluator(embedding_model)
+print(results)
+
+# Output:
+# {
+#   'pearson_cosine': 0.821,
+#   'spearman_cosine': 0.816,
+#   'pearson_manhattan': 0.821,
+#   'spearman_manhattan': 0.816
+# }
+```
+
+## Advanced Technique: Augmented SBERT
+
+For domain adaptation with limited labeled data:
+
+<Steps>
+
+<Step title="Train Cross-Encoder">
+
+```python
+from sentence_transformers import CrossEncoder
+
+# Train a cross-encoder on your domain data
+cross_encoder = CrossEncoder('bert-base-uncased', num_labels=1)
+cross_encoder.fit(
+    train_dataloader=dataloader,
+    epochs=1,
+    warmup_steps=100
+)
+```
+
+</Step>
+
+<Step title="Generate Silver Labels">
+
+Use the cross-encoder to score unlabeled pairs:
+
+```python
+# Score all combinations
+scores = cross_encoder.predict(unlabeled_pairs)
+```
+
+</Step>
+
+<Step title="Train Bi-Encoder">
+
+Train the embedding model on silver-labeled data:
+
+```python
+# Use generated scores as training signal
+train_loss = losses.CosineSimilarityLoss(model=embedding_model)
+trainer.train()
+```
+
+</Step>
+
+</Steps>
+
+## Deployment Considerations
+
+### Model Size and Inference Speed
+
+| Model | Parameters | Embedding Dim | Speed (sentences/sec) |
+|-------|-----------|---------------|----------------------|
+| BERT-base | 110M | 768 | ~1000 |
+| all-MiniLM-L6-v2 | 22M | 384 | ~5000 |
+| all-mpnet-base-v2 | 110M | 768 | ~2000 |
+
+### Saving and Loading
+
+```python
+# Save model
+embedding_model.save('my_embedding_model')
+
+# Load for inference
+from sentence_transformers import SentenceTransformer
+model = SentenceTransformer('my_embedding_model')
+
+# Generate embeddings
+embeddings = model.encode(["example sentence", "another example"])
+```
+
+### Optimization for Production
+
+```python
+# Convert to ONNX for faster inference
+from optimum.onnxruntime import ORTModelForFeatureExtraction
+
+model = ORTModelForFeatureExtraction.from_pretrained(
+    'my_embedding_model',
+    export=True
+)
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+
+<Accordion title="Training loss not decreasing">
+
+**Symptoms**: Loss stays constant or increases
+
+**Solutions**:
+- Reduce learning rate (try 1e-5 instead of 2e-5)
+- Check data quality and label distribution
+- Increase warmup steps
+- Verify loss function matches your data format
+
+</Accordion>
+
+<Accordion title="Out of memory errors">
+
+**Symptoms**: CUDA OOM or system crashes
+
+**Solutions**:
+- Reduce `per_device_train_batch_size` (try 16 or 8)
+- Enable gradient checkpointing
+- Use smaller base model (distilbert, MiniLM)
+- Enable fp16 training
+
+```python
+args = SentenceTransformerTrainingArguments(
+    per_device_train_batch_size=8,  # Reduced
+    fp16=True,  # Enable
+    gradient_checkpointing=True,  # Add this
+)
+```
+
+</Accordion>
+
+<Accordion title="Poor evaluation results">
+
+**Symptoms**: Low correlation scores on validation
+
+**Solutions**:
+- Train for more epochs (2-3 instead of 1)
+- Try different loss functions
+- Ensure evaluation data matches use case
+- Check for data leakage between train/val
+- Use MultipleNegativesRankingLoss for best results
+
+</Accordion>
+
+</AccordionGroup>
+
+## Full Colab Notebook
+
+Experiment with the complete code in Google Colab:
+
+<Card
+  title="Chapter 10: Creating Text Embedding Models"
+  icon="google"
+  href="https://colab.research.google.com/github/HandsOnLLM/Hands-On-Large-Language-Models/blob/main/chapter10/Chapter%2010%20-%20Creating%20Text%20Embedding%20Models.ipynb"
+>
+  Interactive notebook with all training examples and loss functions
+</Card>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card
+  title="Fine-Tuning for Classification"
+  icon="tags"
+  href="/development/fine-tuning-classification"
+>
+  Learn to fine-tune BERT models for text classification tasks
+</Card>
+
+<Card
+  title="Semantic Search"
+  icon="magnifying-glass"
+  href="/advanced/semantic-search-rag"
+>
+  Use your embeddings to build semantic search systems
+</Card>
+
+</CardGroup>

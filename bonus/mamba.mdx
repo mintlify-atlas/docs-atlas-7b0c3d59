@@ -1,0 +1,186 @@
+---
+title: A Visual Guide to Mamba and State Space Models
+description: Explore an exciting alternative to the Transformer architecture through State Space Models
+---
+
+While transformers dominate the LLM landscape, they're not the only game in town. Mamba and State Space Models (SSMs) represent a fundamentally different approach to sequence modeling that addresses some of transformers' key limitations.
+
+<Card
+  title="A Visual Guide to Mamba and State Space Models"
+  icon="diagram-project"
+  href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mamba-and-state"
+>
+  Read the full illustrated guide to Mamba and SSMs
+</Card>
+
+## Why Alternative Architectures Matter
+
+Transformers have revolutionized NLP, but they come with inherent limitations:
+
+- **Quadratic complexity** with sequence length due to self-attention
+- **Memory bottlenecks** when processing long contexts
+- **Computational costs** that scale poorly with input size
+
+State Space Models offer a compelling alternative that addresses these challenges while maintaining strong performance.
+
+<Note>
+  Think of this guide as an "alternative Chapter 3" that explores a different path to building powerful sequence models.
+</Note>
+
+## What You'll Learn
+
+This visual guide introduces you to a fundamentally different approach to sequence modeling:
+
+<CardGroup cols={2}>
+  <Card title="State Space Foundations" icon="cube">
+    - Continuous-time state space models
+    - Discretization for neural networks
+    - Linear time complexity
+    - Efficient long-range dependencies
+  </Card>
+  
+  <Card title="Mamba Architecture" icon="brain">
+    - Selective state spaces
+    - Input-dependent transitions
+    - Hardware-aware design
+    - Scaling properties
+  </Card>
+</CardGroup>
+
+## Key Concepts Explored
+
+### State Space Models (SSMs)
+
+Understand the mathematical foundations:
+
+- **Continuous-time formulation**: How SSMs model sequences as continuous signals
+- **Discretization**: Converting continuous models to work with discrete tokens
+- **Linear recurrence**: Processing sequences in linear time, not quadratic
+- **Structured matrices**: Special matrix forms that enable efficient computation
+
+### The Mamba Innovation
+
+Mamba takes SSMs to the next level with several key innovations:
+
+- **Selective mechanisms**: Input-dependent state transitions (similar to attention's selectivity)
+- **Hardware-aware algorithms**: Designed to run efficiently on modern GPUs
+- **Simplified architecture**: Fewer components than transformers
+- **Strong empirical results**: Competitive with transformers on many benchmarks
+
+<Info>
+  Mamba processes sequences in **linear time** rather than the **quadratic time** of standard transformers, making it particularly attractive for long contexts.
+</Info>
+
+### How State Space Models Work
+
+The guide provides intuitive visualizations of:
+
+1. **State evolution**: How hidden states evolve as the model processes tokens
+2. **Selective copying**: How the model decides what information to remember
+3. **Long-range dependencies**: Maintaining information across thousands of tokens
+4. **Parallel training**: Efficient training despite the recurrent structure
+
+## Mamba vs. Transformers
+
+### Computational Complexity
+
+- **Transformers**: O(n²) attention over sequence length n
+- **Mamba**: O(n) selective state space operations
+
+This difference becomes dramatic for long sequences (10k+ tokens).
+
+### Memory Efficiency
+
+- **Transformers**: Must cache all previous key-value pairs
+- **Mamba**: Fixed-size state vector regardless of sequence length
+
+### Expressiveness
+
+Both architectures can model complex patterns:
+
+- **Transformers**: Excel at precise token-to-token relationships
+- **Mamba**: Strong at continuous, flow-like dependencies
+
+<Note>
+  The choice between transformers and SSMs isn't always clear-cut. Each has strengths for different types of tasks.
+</Note>
+
+## Hybrid Architectures
+
+The guide explores exciting developments in combining both approaches:
+
+- **Jamba**: Mixing transformer and Mamba blocks in a single model
+- **Best of both worlds**: Transformer precision + Mamba efficiency
+- **Adaptive computation**: Using the right mechanism for each layer
+
+<Card
+  title="Jamba Architecture"
+  icon="layer-group"
+  href="https://www.ai21.com/blog/announcing-jamba"
+>
+  Learn about AI21's hybrid Transformer-Mamba model
+</Card>
+
+## Visual Highlights
+
+The guide features detailed illustrations of:
+
+- State space model architecture diagrams
+- How selective mechanisms work
+- Comparison of attention vs. state space operations
+- Hybrid model architectures
+
+## Practical Implications
+
+When might you choose Mamba over transformers?
+
+- **Long document processing**: Mamba's linear complexity shines
+- **Streaming applications**: Fixed-size state makes real-time processing easier
+- **Resource-constrained deployments**: Lower memory requirements
+- **Research exploration**: Understanding alternatives to transformers
+
+## How This Extends the Book
+
+**Chapter 3** provides a comprehensive foundation in decoder-based transformers. This guide complements that by:
+
+- Introducing a **fundamentally different architecture**
+- Showing that **transformers aren't the only solution**
+- Exploring **tradeoffs** between different architectural choices
+- Preparing you for **future developments** that may blend approaches
+
+<Info>
+  Understanding alternative architectures makes you a more well-rounded ML practitioner and helps you choose the right tool for each problem.
+</Info>
+
+## Prerequisites
+
+Before exploring this guide, you should have:
+
+- Read **Chapter 3** (Decoder-Based Language Models)
+- Understanding of sequence modeling concepts
+- Familiarity with recurrent architectures (helpful but not required)
+- Basic linear algebra knowledge
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Chapter 3: Transformers" icon="book" href="/fundamentals/transformer-architecture">
+    Understand the transformer architecture first
+  </Card>
+  
+  <Card title="Mixture of Experts" icon="brain" href="/bonus/mixture-of-experts">
+    Explore another architectural innovation
+  </Card>
+  
+  <Card title="DeepSeek-R1" icon="robot" href="/bonus/deepseek-r1">
+    See how MoE is used in modern reasoning models
+  </Card>
+  
+  <Card title="LLM Agents" icon="users" href="/bonus/llm-agents">
+    Apply different architectures to agent systems
+  </Card>
+</CardGroup>
+
+<Note>
+  State Space Models represent the kind of architectural innovation that keeps the field of deep learning dynamic. Today's alternative might be tomorrow's standard!
+</Note>

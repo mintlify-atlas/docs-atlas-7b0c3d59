@@ -1,0 +1,290 @@
+---
+title: The Illustrated DeepSeek-R1
+description: Deep dive into the groundbreaking open-weights reasoning model that rivals OpenAI's o1
+---
+
+DeepSeek-R1 represents a watershed moment in AI: a powerful reasoning model with open weights that rivals proprietary systems. Its release demonstrated that cutting-edge reasoning capabilities don't require massive corporate resources.
+
+<Card
+  title="The Illustrated DeepSeek-R1"
+  icon="robot"
+  href="https://newsletter.languagemodels.co/p/the-illustrated-deepseek-r1"
+>
+  Read the complete illustrated breakdown of DeepSeek-R1
+</Card>
+
+## Why DeepSeek-R1 Matters
+
+The impact of DeepSeek-R1 extends far beyond its performance:
+
+- **Open weights**: First reasoning model of this caliber released openly
+- **Competitive performance**: Rivals OpenAI's o1 on many benchmarks
+- **Novel techniques**: Innovative training approaches
+- **Accessibility**: Democratizes reasoning LLM capabilities
+- **Cost efficiency**: Achieves results with less compute than expected
+
+<Info>
+  DeepSeek-R1's unexpected release in early 2024 showed that the open-source community can compete at the frontier of AI capabilities.
+</Info>
+
+## What You'll Learn
+
+This illustrated guide provides a comprehensive breakdown of DeepSeek-R1:
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="diagram-project">
+    - Mixture of Experts design
+    - 256 experts (8 active)
+    - Model scaling properties
+    - Inference characteristics
+  </Card>
+  
+  <Card title="Training Process" icon="graduation-cap">
+    - Multi-stage training pipeline
+    - Rule-based verifiers
+    - Reinforcement learning
+    - Self-improvement loops
+  </Card>
+</CardGroup>
+
+## The Architecture
+
+DeepSeek-R1 uses a Mixture of Experts (MoE) architecture:
+
+### Scale and Efficiency
+
+- **671 billion total parameters**
+- **256 experts** in each MoE layer
+- **8 experts activated** per token
+- **~37 billion active parameters** per forward pass
+
+<Note>
+  The MoE architecture means DeepSeek-R1 has the capacity of a 671B model while using only ~37B parameters per token—similar inference cost to much smaller models.
+</Note>
+
+### Why MoE for Reasoning?
+
+- **Specialization**: Different experts handle different reasoning types
+- **Efficiency**: Massive capacity without massive compute
+- **Scalability**: Can add more experts as needed
+- **Performance**: Better than dense models at same active parameter count
+
+<Card
+  title="Learn More About MoE"
+  icon="users-gear"
+  href="/bonus/mixture-of-experts"
+>
+  Deep dive into Mixture of Experts architectures
+</Card>
+
+## The Training Process
+
+DeepSeek-R1's training is what makes it special:
+
+### Stage 1: Foundation Model
+
+Start with a strong base model:
+- Pre-trained on diverse data
+- Standard language modeling objective
+- No reasoning-specific training yet
+
+### Stage 2: Reasoning Data Collection
+
+Create high-quality reasoning examples:
+- Mathematical problems with solutions
+- Code challenges with step-by-step solutions
+- Scientific reasoning tasks
+- Multi-hop logical problems
+
+### Stage 3: Supervised Fine-Tuning
+
+Train on reasoning traces:
+- Learn to generate step-by-step solutions
+- Develop chain-of-thought capabilities
+- Practice self-verification
+
+### Stage 4: Rule-Based Verification
+
+The innovation that sets DeepSeek-R1 apart:
+
+**Automated Verifiers**: Systems that check reasoning quality
+- **Code compilation**: Does generated code actually run?
+- **Mathematical validity**: Are equations correctly formed?
+- **Logical consistency**: Do conclusions follow from premises?
+- **Format compliance**: Does output match expected structure?
+
+<Info>
+  Rule-based verifiers provide automatic, reliable feedback signals without requiring human labeling for every training example.
+</Info>
+
+### Stage 5: Reinforcement Learning
+
+Optimize based on verifier feedback:
+- Generate reasoning chains
+- Verify correctness automatically
+- Reward correct reasoning steps
+- Update model via RL
+- Repeat to improve
+
+### Stage 6: Self-Improvement
+
+The model teaches itself:
+- Generate new problems
+- Solve them with reasoning
+- Verify solutions
+- Train on high-quality self-generated data
+- Bootstrap to higher performance
+
+## Key Innovations
+
+### Rule-Based Verifiers
+
+The guide provides detailed visualizations of verification:
+
+**For Code**:
+1. Model generates code solution
+2. Verifier attempts to compile/execute
+3. Test cases validate correctness
+4. Success/failure becomes training signal
+
+**For Math**:
+1. Model generates mathematical reasoning
+2. Verifier checks symbolic manipulation
+3. Final answer validated against ground truth
+4. Step-level correctness assessed
+
+<Note>
+  Verifiers provide dense feedback signals that accelerate learning and improve reliability.
+</Note>
+
+### Multi-Turn Reasoning
+
+DeepSeek-R1 can engage in extended reasoning:
+- Break complex problems into sub-problems
+- Solve incrementally
+- Self-correct when errors detected
+- Maintain consistency across reasoning chain
+
+### Long-Context Reasoning
+
+The model handles extended contexts:
+- Process long problem descriptions
+- Maintain reasoning state over many steps
+- Reference earlier parts of reasoning chain
+- Build complex arguments incrementally
+
+## Performance Characteristics
+
+What DeepSeek-R1 excels at:
+
+<CardGroup cols={2}>
+  <Card title="Mathematics" icon="calculator">
+    Advanced problem solving, proof generation, symbolic reasoning
+  </Card>
+  
+  <Card title="Code Generation" icon="code">
+    Algorithm design, debugging, optimization, testing
+  </Card>
+  
+  <Card title="Logic Puzzles" icon="puzzle-piece">
+    Multi-step reasoning, constraint satisfaction
+  </Card>
+  
+  <Card title="Scientific Reasoning" icon="flask">
+    Hypothesis testing, experimental design
+  </Card>
+</CardGroup>
+
+## Comparison with o1
+
+How DeepSeek-R1 stacks up against OpenAI's o1:
+
+| Aspect | DeepSeek-R1 | OpenAI o1 |
+|--------|-------------|------------|
+| **Weights** | Open | Closed |
+| **Math Reasoning** | Comparable | Comparable |
+| **Code Generation** | Competitive | Slightly better |
+| **Cost** | Lower training cost | Higher (estimated) |
+| **Accessibility** | High (can self-host) | API only |
+
+<Note>
+  The fact that an openly available model rivals a closed, proprietary system is a major milestone for the AI community.
+</Note>
+
+## Visual Highlights
+
+The illustrated guide features:
+
+- Complete architecture diagrams showing MoE layers
+- Training pipeline visualization across all stages
+- Rule-based verifier workflows
+- Comparison with other reasoning models
+- Performance benchmark breakdowns
+
+## Practical Implications
+
+### For Researchers
+- Study reasoning model training techniques
+- Build upon open architecture
+- Experiment with verification approaches
+- Develop new reasoning benchmarks
+
+### For Practitioners
+- Deploy powerful reasoning capabilities
+- Self-host for data privacy
+- Fine-tune for specific domains
+- Integrate into applications
+
+### For the Community
+- Democratized access to frontier capabilities
+- Transparency in model development
+- Foundation for further innovation
+
+## How This Extends the Book
+
+**Chapter 12** covers standard training and fine-tuning approaches.
+
+This guide extends that by:
+
+- Introducing **reinforcement learning** for reasoning
+- Showcasing **rule-based verification** as a training signal
+- Demonstrating **multi-stage training** pipelines
+- Illustrating **self-improvement** techniques
+- Combining **MoE architecture** with reasoning training
+
+<Info>
+  DeepSeek-R1 represents the culmination of many advanced techniques: MoE, reasoning, RL, and self-improvement all working together.
+</Info>
+
+## Prerequisites
+
+Before exploring this guide, you should have:
+
+- Read **Chapter 12** (Training and Fine-Tuning)
+- Understanding of **Mixture of Experts** (bonus guide recommended)
+- Familiarity with **reasoning LLMs** (bonus guide recommended)
+- Basic knowledge of reinforcement learning
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Reasoning LLMs" icon="brain" href="/bonus/reasoning-llms">
+    Understand reasoning model fundamentals first
+  </Card>
+  
+  <Card title="Mixture of Experts" icon="users-gear" href="/bonus/mixture-of-experts">
+    Learn about the MoE architecture
+  </Card>
+  
+  <Card title="Chapter 12: Training" icon="book" href="/development/fine-tuning-generation">
+    Foundation for understanding training pipelines
+  </Card>
+  
+  <Card title="LLM Agents" icon="users" href="/bonus/llm-agents">
+    Apply reasoning models in agent systems
+  </Card>
+</CardGroup>
+
+<Note>
+  DeepSeek-R1 demonstrates that open research and development can produce models competitive with the best proprietary systems.
+</Note>

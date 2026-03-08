@@ -1,0 +1,251 @@
+---
+title: A Visual Guide to Reasoning LLMs
+description: Explore the paradigm shift from train-time to test-time compute through reasoning models
+---
+
+Reasoning LLMs represent a fundamental shift in how we think about model capabilities. Instead of only scaling up training (bigger models, more data, longer training), reasoning models also scale up inference through extended deliberation.
+
+<Card
+  title="A Visual Guide to Reasoning LLMs"
+  icon="brain"
+  href="https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-reasoning-llms"
+>
+  Read the full illustrated guide to reasoning LLMs
+</Card>
+
+## The Paradigm Shift
+
+Traditional LLM development focused on **train-time compute**:
+- Larger models (more parameters)
+- More training data
+- Longer training runs
+- Better optimization algorithms
+
+Reasoning LLMs add **test-time compute**:
+- Extended deliberation during inference
+- Multiple reasoning steps
+- Self-verification and correction
+- Dynamic problem-solving strategies
+
+<Info>
+  This shift is similar to the difference between memorizing answers and learning to think through problems step-by-step.
+</Info>
+
+## What You'll Learn
+
+This visual guide explores how LLMs can be taught to reason:
+
+<CardGroup cols={2}>
+  <Card title="Chain-of-Thought" icon="link">
+    - Prompting for reasoning
+    - Step-by-step solutions
+    - Zero-shot vs. few-shot CoT
+    - Self-consistency methods
+  </Card>
+  
+  <Card title="Training Techniques" icon="graduation-cap">
+    - Reasoning data generation
+    - Process supervision
+    - Outcome-based rewards
+    - Reinforcement learning approaches
+  </Card>
+</CardGroup>
+
+## Key Concepts Explored
+
+### Chain-of-Thought (CoT) Reasoning
+
+The foundation of reasoning LLMs:
+
+**Prompting Approach**: Simply asking the model to "think step by step"
+- No additional training required
+- Works with existing models
+- Significantly improves performance on reasoning tasks
+- Minimal implementation cost
+
+**Few-Shot CoT**: Providing examples of reasoning chains
+- Shows the model what good reasoning looks like
+- Teaches problem decomposition
+- Demonstrates verification steps
+
+<Note>
+  Chain-of-thought prompting (covered in Chapter 6) is the starting point. This guide shows how to build reasoning directly into model training.
+</Note>
+
+### Process vs. Outcome Supervision
+
+Two approaches to training reasoning models:
+
+**Outcome Supervision**:
+- Reward correct final answers
+- Simpler to implement
+- Doesn't care about the reasoning process
+- May lead to "lucky guesses"
+
+**Process Supervision**:
+- Reward each correct reasoning step
+- More expensive (requires step-level labels)
+- Encourages robust reasoning
+- Better generalization to new problems
+
+### Test-Time Compute Scaling
+
+The guide illustrates a fascinating property:
+
+- More inference steps → Better performance
+- Diminishing returns but consistent improvement
+- Tradeoff between latency and accuracy
+- Dynamic compute allocation based on problem difficulty
+
+<Info>
+  Unlike standard models where inference cost is fixed, reasoning models let you trade compute for accuracy at inference time.
+</Info>
+
+## Training Reasoning Models
+
+The guide covers several training approaches:
+
+### Supervised Fine-Tuning on Reasoning Data
+
+1. **Collect reasoning traces**: Human-written step-by-step solutions
+2. **Fine-tune on traces**: Train model to generate reasoning chains
+3. **Evaluate on reasoning tasks**: Test chain-of-thought quality
+
+### Reinforcement Learning from Human Feedback (RLHF)
+
+- **Reward model**: Trained to score reasoning quality
+- **Policy optimization**: Use RL to maximize rewards
+- **Exploration**: Discover new reasoning strategies
+- **Alignment**: Ensure reasoning aligns with human preferences
+
+### Self-Training Approaches
+
+- **Generate solutions**: Model produces reasoning chains
+- **Verify correctness**: Automatic or manual verification
+- **Filter and retrain**: Keep good examples, iterate
+- **Bootstrap improvement**: Model learns from its own best outputs
+
+## Reasoning Techniques
+
+The guide explores various reasoning strategies:
+
+### Tree-of-Thoughts
+- Branch into multiple reasoning paths
+- Explore alternatives in parallel
+- Backtrack from dead ends
+- Select the most promising path
+
+### Self-Verification
+- Check reasoning steps for errors
+- Validate final answer
+- Regenerate if inconsistencies found
+- Improves reliability
+
+### Self-Consistency
+- Generate multiple reasoning chains
+- Take majority vote over answers
+- More robust than single chain
+- Trades compute for reliability
+
+<Note>
+  These techniques can be combined: use tree-of-thoughts for complex problems, self-consistency for reliable answers, and self-verification for correctness.
+</Note>
+
+## DeepSeek-R1 Preview
+
+The guide includes coverage of DeepSeek-R1, a breakthrough reasoning model:
+
+- Released unexpectedly in early 2024
+- Rivals OpenAI's o1 performance
+- Open-weights availability
+- Novel training techniques
+
+<Card
+  title="DeepSeek-R1 Deep Dive"
+  icon="robot"
+  href="/bonus/deepseek-r1"
+>
+  See the dedicated guide for complete DeepSeek-R1 coverage
+</Card>
+
+## Practical Applications
+
+When reasoning models excel:
+
+<CardGroup cols={2}>
+  <Card title="Mathematics" icon="calculator">
+    Multi-step problem solving, proof generation
+  </Card>
+  
+  <Card title="Code Generation" icon="code">
+    Algorithm design, debugging, optimization
+  </Card>
+  
+  <Card title="Scientific Reasoning" icon="flask">
+    Hypothesis formation, experimental design
+  </Card>
+  
+  <Card title="Complex Planning" icon="sitemap">
+    Strategy development, multi-step procedures
+  </Card>
+</CardGroup>
+
+## Visual Highlights
+
+The guide features detailed illustrations of:
+
+- Train-time vs. test-time compute comparison
+- Chain-of-thought reasoning flows
+- Process supervision vs. outcome supervision
+- Scaling laws for test-time compute
+- Tree-of-thoughts exploration
+
+## How This Extends the Book
+
+**Chapter 6** introduces chain-of-thought prompting as a technique for better outputs.
+
+**Chapter 12** covers training and fine-tuning for standard models.
+
+This guide builds upon both by:
+
+- Moving from **prompting** to **training** for reasoning
+- Exploring **test-time compute** as a new scaling dimension
+- Introducing **reinforcement learning** for reasoning
+- Showing the **paradigm shift** from scaling models to scaling inference
+
+<Note>
+  Reasoning LLMs represent the next frontier in language AI. Understanding this shift is crucial for staying current in the field.
+</Note>
+
+## Prerequisites
+
+Before exploring this guide, you should have:
+
+- Read **Chapter 6** (Prompt Engineering)
+- Read **Chapter 12** (Training and Fine-Tuning)
+- Understanding of chain-of-thought prompting
+- Familiarity with reinforcement learning concepts (helpful)
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Chapter 6: Prompting" icon="book" href="/advanced/prompt-engineering">
+    Learn chain-of-thought prompting basics
+  </Card>
+  
+  <Card title="Chapter 12: Training" icon="book" href="/development/fine-tuning-generation">
+    Understand model training fundamentals
+  </Card>
+  
+  <Card title="DeepSeek-R1" icon="robot" href="/bonus/deepseek-r1">
+    Deep dive into a cutting-edge reasoning model
+  </Card>
+  
+  <Card title="LLM Agents" icon="users" href="/bonus/llm-agents">
+    Apply reasoning to autonomous agents
+  </Card>
+</CardGroup>
+
+<Info>
+  Reasoning LLMs show that intelligence isn't just about model size—it's also about how the model uses its capacity to think through problems.
+</Info>
